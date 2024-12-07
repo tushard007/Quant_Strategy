@@ -3,6 +3,8 @@ package org.factor_investing.quant_strategy.momentum.model;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.sql.Date;
 
@@ -17,4 +19,10 @@ public class WR_TopMomentumStock {
     private String stockName;
     private Date rebalenceDate;
     private Float percentageReturn;
+    @CreationTimestamp
+    private java.util.Date creationDate;
+
+    @UpdateTimestamp
+    private java.util.Date modificationDate;
+
 }
