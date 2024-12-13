@@ -10,12 +10,12 @@ import java.sql.Date;
 import java.util.List;
 
 @RestController
-@RequestMapping("/momeuntumStock")
+@RequestMapping("/momentumStock")
 public class TopMomentumStockController {
     @Autowired
     private TopMomentumStockService topMomentumStockService;
-    @PostMapping("/{rebalenceStrategy}/{rebalenceDate}")
-    public List<TopN_MomentumStock> getStockReturnForYear(@PathVariable Date rebalenceDate, @PathVariable RebalenceStrategy rebalenceStrategy) throws InterruptedException {
-         return topMomentumStockService.CalculateStockReturnForYear( rebalenceDate,rebalenceStrategy);
+    @PostMapping("/{rebalancedStrategy}/{rebalancedDate}")
+    public List<TopN_MomentumStock> getStockReturnForYear(@PathVariable Date rebalancedDate, @PathVariable RebalenceStrategy rebalancedStrategy) {
+         return topMomentumStockService.CalculateStockReturnForYear( rebalancedDate,rebalancedStrategy);
     }
 }

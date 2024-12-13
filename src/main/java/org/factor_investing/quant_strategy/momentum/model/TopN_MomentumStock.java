@@ -22,7 +22,6 @@ public class TopN_MomentumStock{
     public float percentageReturn12Months;
     public float percentageReturn6Months;
     public float percentageReturn3Months;
-
     public Date startDate;
     public Date endDate;
     public float startDateStockPrice;
