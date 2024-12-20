@@ -30,7 +30,4 @@ public class TopN_MomentumStock{
     @CreationTimestamp
     private java.util.Date creationDate;
 
-    @UpdateTimestamp
-    private java.util.Date modificationDate;
-
 }

@@ -29,6 +29,24 @@ public class TopMomentumStockService {
     @Autowired
     private StockPriceCacheService stockPriceCacheService;
 
+    public void runTopMomentumStocksForPeriod(RebalenceStrategy rebalenceStrategy,java.sql.Date startDate,java.sql.Date endDate) {
+        Set<java.sql.Date> eachRebalencedDate   = new HashSet<>();
+        if(RebalenceStrategy.Weekly.equals(rebalenceStrategy)){
+            eachRebalencedDate= stockPriceDataRepository.findDistinctBetweenDateOfEachFriday(startDate,endDate);
+            log.info("Each Friday Date:{}",eachRebalencedDate+"Date count"+ eachRebalencedDate.size()+" Rebalanced Strategy: "+rebalenceStrategy);
+        }
+      if(RebalenceStrategy.Monthly.equals(rebalenceStrategy)){
+            eachRebalencedDate = stockPriceDataRepository.findDistinctLastDateOfEachMonth(startDate, endDate);
+            log.info("Each Month Date:{}",eachRebalencedDate+"Date count"+ eachRebalencedDate.size()+" Rebalanced Strategy: "+rebalenceStrategy);
+        }
+
+      if(!eachRebalencedDate.isEmpty()) {
+          eachRebalencedDate.add(endDate);
+          for (Date rebalancedDate : eachRebalencedDate) {
+              CalculateStockReturnForYear(rebalancedDate, rebalenceStrategy);
+          }
+      }
+    }
 
     //Calculate past 1y,6m,3m stock return and assign rank based on yearly return in asc order
     public List<TopN_MomentumStock> CalculateStockReturnForYear(Date rebalenceDate, RebalenceStrategy rebalenceStrategy) {
@@ -84,19 +102,19 @@ public class TopMomentumStockService {
                     if (priceData3MonthAgo >0) {
                         float return3Month = ReturnCalculationUtils.percentReturn(priceData3MonthAgo, endDatePrice);
                         topNMomentumStock.setPercentageReturn3Months(return3Month);
-                        log.info("\n 3 Month Return{} \n", return3Month);
+                        log.debug("\n 3 Month Return{} \n", return3Month);
                     }
                     float priceData6MonthAgo = stockPriceCacheService.getStockPrice(stockName, java.sql.Date.valueOf(previous6MonthDate));
                     if (priceData6MonthAgo>0) {
                         float return6Month = ReturnCalculationUtils.percentReturn(priceData6MonthAgo, endDatePrice);
                         topNMomentumStock.setPercentageReturn6Months(return6Month);
-                        log.info("\n 6 Month Return{} \n", return6Month);
+                        log.debug("\n 6 Month Return{} \n", return6Month);
                     }
 
                     topNMomentumStock.setPercentageReturn12Months(ReturnCalculationUtils.percentReturn(startDatePrice, endDatePrice));
-                    log.info("\n Start Stock Date:{} Start Price:{}", topNMomentumStock.getStartDate(), topNMomentumStock.getStartDateStockPrice());
-                    log.info("\n End Date:{}end Price:{}", topNMomentumStock.getEndDate(), topNMomentumStock.getEndDateStockPrice());
-                    log.info("\n Annual Return{} \n", topNMomentumStock.getPercentageReturn12Months());
+                    log.debug("\n Start Stock Date:{} Start Price:{}", topNMomentumStock.getStartDate(), topNMomentumStock.getStartDateStockPrice());
+                    log.debug("\n End Date:{}end Price:{}", topNMomentumStock.getEndDate(), topNMomentumStock.getEndDateStockPrice());
+                    log.debug("\n Annual Return{} \n", topNMomentumStock.getPercentageReturn12Months());
                     if (topNMomentumStock.getPercentageReturn12Months() > 0 &&
                             topNMomentumStock.getPercentageReturn6Months() > 0 &&
                             topNMomentumStock.getPercentageReturn3Months() > 0) {
@@ -113,8 +131,8 @@ public class TopMomentumStockService {
             List<TopN_MomentumStock> finalHighestReturnSMList = highestReturnSMList;
             IntStream.range(0, highestReturnSMList.size())
                     .forEach(i -> finalHighestReturnSMList.get(i).setRank(i + 1));
-
-            topMomentumStockRepository.saveAll(finalHighestReturnSMList);
+        highestReturnSMList=finalHighestReturnSMList.stream().limit(50).toList();
+            topMomentumStockRepository.saveAll(highestReturnSMList);
             return finalHighestReturnSMList;
         }
     }
