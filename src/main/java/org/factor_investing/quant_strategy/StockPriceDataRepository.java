@@ -18,13 +18,8 @@ public interface StockPriceDataRepository extends JpaRepository<StockPriceData, 
     Set<Date> findDistinctByPriceDate();
     StockPriceData findByStockTickerAndPriceDate(String stockTicker,java.sql.Date priceDate);
 
-//    SELECT DISTINCT date
-//    FROM stock_price_data
-//    WHERE TRIM(TO_CHAR(date, 'Day')) = 'Friday'
-//    AND date BETWEEN '2024-09-20' AND '2024-12-20'
-//    ORDER BY date;
-
-    @Query("SELECT DISTINCT s.priceDate FROM StockPriceData s WHERE s.priceDate BETWEEN :startDate AND :endDate AND TRIM(TO_CHAR(s.priceDate, 'Day')) = 'Friday' ORDER BY s.priceDate")
+    @Query("SELECT DISTINCT s.priceDate FROM StockPriceData s " +
+            "WHERE s.priceDate BETWEEN :startDate AND :endDate AND TRIM(TO_CHAR(s.priceDate, 'Day')) = 'Friday' ORDER BY s.priceDate")
     Set<java.sql.Date> findDistinctBetweenDateOfEachFriday(@Param("startDate") java.sql.Date startDate, @Param("endDate") java.sql.Date endDate);
 
     @Query(value = "SELECT DISTINCT ON (date_trunc('month', date)) date AS last_date " +

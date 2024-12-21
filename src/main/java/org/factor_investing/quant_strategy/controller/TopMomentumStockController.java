@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.sql.Date;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/momentum-stock")
@@ -23,5 +24,10 @@ public class TopMomentumStockController {
     @PostMapping("/{rebalancedStrategy}/{rebalancedDate}")
     public List<TopN_MomentumStock> getStockReturnForYear(@PathVariable Date rebalancedDate, @PathVariable RebalenceStrategy rebalancedStrategy) {
          return topMomentumStockService.CalculateStockReturnForYear( rebalancedDate,rebalancedStrategy);
+    }
+
+    @GetMapping("/TopMomentumStock/{rebalancedStrategy}/groupByRebalencedDate")
+    public Map<java.util.Date, List<TopN_MomentumStock>> getTopMomentumStockGroupByRebalencedDate(@PathVariable RebalenceStrategy rebalancedStrategy) {
+        return topMomentumStockService.getTopNStockGroupByRebalencedDate(rebalancedStrategy);
     }
 }
