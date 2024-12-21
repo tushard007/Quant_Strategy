@@ -158,6 +158,9 @@ public class TopMomentumStockService {
         return topNStockGroupByRebalenceDdate;
     }
 
+    public void updateTopMomentumStock(List<TopN_MomentumStock> topN_momentumStock) {
+        topMomentumStockRepository.saveAll(topN_momentumStock);
+    }
 }
 
 

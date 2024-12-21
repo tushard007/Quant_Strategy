@@ -10,8 +10,7 @@ import java.util.List;
 
 @Repository
 public interface TopMomentumStockRepository extends JpaRepository<TopN_MomentumStock, Integer> {
-    //    @Query("SELECT tms FROM TopN_MomentumStock tms WHERE tms.rebalancedStrategy = :rebalancedStrategy " +
-//                  "and tms.rank Between 1 and 20 order by tms.endDate")
+
     @Query(value = "select * from t_top_momentum_stock where " +
             "rebalanced_strategy=:rebalancedStrategy and rank between 1 and 20 order by end_date, rank asc",
             nativeQuery = true)

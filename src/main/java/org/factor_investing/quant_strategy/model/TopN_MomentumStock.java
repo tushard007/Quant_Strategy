@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.sql.Date;
 
@@ -26,7 +27,11 @@ public class TopN_MomentumStock{
     public float startDateStockPrice;
     public float endDateStockPrice;
     public int rank;
+    @Enumerated(EnumType.STRING)
+    private StockSignal stockSignal;
     @CreationTimestamp
     private java.util.Date creationDate;
+    @UpdateTimestamp
+    private java.util.Date modificationDate;
 
 }
