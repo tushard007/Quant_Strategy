@@ -1,4 +1,4 @@
-package org.factor_investing.quant_strategy.momentum.model;
+package org.factor_investing.quant_strategy.model;
 
 import jakarta.persistence.*;
 import lombok.Getter;

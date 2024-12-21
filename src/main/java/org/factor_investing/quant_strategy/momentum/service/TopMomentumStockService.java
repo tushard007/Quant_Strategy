@@ -2,10 +2,10 @@ package org.factor_investing.quant_strategy.momentum.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.factor_investing.quant_strategy.StockPriceCacheService;
-import org.factor_investing.quant_strategy.StockPriceDataRepository;
-import org.factor_investing.quant_strategy.momentum.model.RebalenceStrategy;
-import org.factor_investing.quant_strategy.momentum.model.TopN_MomentumStock;
-import org.factor_investing.quant_strategy.momentum.repository.TopMomentumStockRepository;
+import org.factor_investing.quant_strategy.repository.StockPriceDataRepository;
+import org.factor_investing.quant_strategy.model.RebalenceStrategy;
+import org.factor_investing.quant_strategy.model.TopN_MomentumStock;
+import org.factor_investing.quant_strategy.repository.TopMomentumStockRepository;
 import org.factor_investing.quant_strategy.util.DateUtil;
 import org.factor_investing.quant_strategy.util.ReturnCalculationUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,7 +13,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -143,8 +142,6 @@ public class TopMomentumStockService {
     }
 
     public Map<Date, List<TopN_MomentumStock>> getTopNStockGroupByRebalencedDate(RebalenceStrategy rebalancedStrategy) {
-
-
         Map<Date, List<TopN_MomentumStock>> topNStockGroupByRebalenceDdate=new LinkedHashMap<>();
         topNStockGroupByRebalenceDdate = getAllTopMomentumStockByRebalenceStrategy(rebalancedStrategy).stream()
                 .sorted(Comparator.comparing(TopN_MomentumStock::getEndDate)) // Ensure ordering by date
@@ -158,18 +155,9 @@ public class TopMomentumStockService {
             stocks.forEach(stock -> System.out.println("  Stock: " + stock.getStockName() +
                     "  Rank: " + stock.getRank() + "  Annual Return: " + stock.getPercentageReturn12Months()));
         });
-        runMomentumStrategyEachMonth(rebalancedStrategy);
         return topNStockGroupByRebalenceDdate;
     }
-    public void runMomentumStrategyEachMonth(RebalenceStrategy rebalancedStrategy) {
-        List<TopN_MomentumStock> topNStockList = getAllTopMomentumStockByRebalenceStrategy(rebalancedStrategy);
-        Queue<Date> rebalancedDates = topNStockList.stream()
-                .map(TopN_MomentumStock::getEndDate)
-                .distinct()
-                .collect(Collectors.toCollection(LinkedList::new));
 
-        System.out.println("Rebalanced Dates: " + rebalancedDates);
-    }
 }
 
 

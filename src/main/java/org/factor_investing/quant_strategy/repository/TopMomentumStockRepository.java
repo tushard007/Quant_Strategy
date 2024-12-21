@@ -1,8 +1,6 @@
-package org.factor_investing.quant_strategy.momentum.repository;
+package org.factor_investing.quant_strategy.repository;
 
-import org.factor_investing.quant_strategy.StockPriceData;
-import org.factor_investing.quant_strategy.momentum.model.RebalenceStrategy;
-import org.factor_investing.quant_strategy.momentum.model.TopN_MomentumStock;
+import org.factor_investing.quant_strategy.model.TopN_MomentumStock;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

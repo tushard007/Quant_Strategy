@@ -1,5 +1,6 @@
-package org.factor_investing.quant_strategy;
+package org.factor_investing.quant_strategy.repository;
 
+import org.factor_investing.quant_strategy.model.StockPriceData;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

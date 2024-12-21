@@ -1,6 +1,8 @@
 package org.factor_investing.quant_strategy;
 
 import lombok.extern.slf4j.Slf4j;
+import org.factor_investing.quant_strategy.model.StockPriceData;
+import org.factor_investing.quant_strategy.repository.StockPriceDataRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationStartedEvent;
 import org.springframework.context.event.EventListener;
