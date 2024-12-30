@@ -44,13 +44,13 @@ public class TopMomentumStockService {
         if (!eachRebalencedDate.isEmpty()) {
             eachRebalencedDate.add(endDate);
             for (Date rebalancedDate : eachRebalencedDate) {
-                CalculateStockReturnForYear(rebalancedDate, rebalenceStrategy);
+                calculateStockReturn(rebalancedDate, rebalenceStrategy);
             }
         }
     }
 
     //Calculate past 1y,6m,3m stock return and assign rank based on yearly return in asc order
-    public List<TopN_MomentumStock> CalculateStockReturnForYear(Date rebalenceDate, RebalenceStrategy rebalenceStrategy) {
+    public List<TopN_MomentumStock> calculateStockReturn(Date rebalenceDate, RebalenceStrategy rebalenceStrategy) {
 
         //Getting All Unique stock price date from database
         Set<Date> allUniqueStockPriceDates = stockPriceDataRepository.findDistinctByPriceDate();
@@ -132,7 +132,7 @@ public class TopMomentumStockService {
         List<TopN_MomentumStock> finalHighestReturnSMList = highestReturnSMList;
         IntStream.range(0, highestReturnSMList.size())
                 .forEach(i -> finalHighestReturnSMList.get(i).setRank(i + 1));
-        highestReturnSMList = finalHighestReturnSMList.stream().limit(50).toList();
+        highestReturnSMList = finalHighestReturnSMList.stream().toList();
         topMomentumStockRepository.saveAll(highestReturnSMList);
         return finalHighestReturnSMList;
     }

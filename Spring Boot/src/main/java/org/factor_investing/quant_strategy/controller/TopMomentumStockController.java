@@ -23,7 +23,7 @@ public class TopMomentumStockController {
 
     @PostMapping("/{rebalancedStrategy}/{rebalancedDate}")
     public List<TopN_MomentumStock> getStockReturnForYear(@PathVariable Date rebalancedDate, @PathVariable RebalenceStrategy rebalancedStrategy) {
-         return topMomentumStockService.CalculateStockReturnForYear( rebalancedDate,rebalancedStrategy);
+         return topMomentumStockService.calculateStockReturn( rebalancedDate,rebalancedStrategy);
     }
 
     @GetMapping("/TopMomentumStock/{rebalancedStrategy}/groupByRebalencedDate")
