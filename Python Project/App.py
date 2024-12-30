@@ -1,13 +1,13 @@
 import pandas as pd
 import yfinance as yf
-import psycopg2
+import psycopg
 from datetime import datetime
 
 
 # Function to connect to PostgreSQL database
 def connect_db():
     try:
-        conn = psycopg2.connect(
+        conn = psycopg.connect(
             dbname="factor_investing",
             user="tushardesarda",
             password="",
@@ -60,7 +60,7 @@ def fetch_and_store_stock_data(csv_file):
     for ticker in tickers:
         try:
             # Fetch historical data for the last 30 days
-            stock_price_data = yf.Ticker(ticker + '.NS').history(period='8y')  # Append '.NS' for NSE stocks
+            stock_price_data = yf.Ticker(ticker + '.NS').history(period='max')  # Append '.NS' for NSE stocks
 
             # Iterate over the fetched data and insert into database
             for index, row in stock_price_data.iterrows():
