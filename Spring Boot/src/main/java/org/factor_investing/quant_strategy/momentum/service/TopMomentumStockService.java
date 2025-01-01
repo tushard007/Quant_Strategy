@@ -137,13 +137,17 @@ public class TopMomentumStockService {
         return finalHighestReturnSMList;
     }
 
-    public List<TopN_MomentumStock> getAllTopMomentumStockByRebalenceStrategy(RebalenceStrategy rebalancedStrategy) {
-        return topMomentumStockRepository.findAllByRebalancedStrategy(rebalancedStrategy.toString());
+    public List<TopN_MomentumStock> getMomentumStockByRebalenceStrategyBetweenRank(RebalenceStrategy rebalancedStrategy) {
+        return topMomentumStockRepository.findAllByRebalancedStrategyBetweenRank(rebalancedStrategy.toString());
+    }
+
+    public List<TopN_MomentumStock> getMomentumStockByRebalenceStrategy(RebalenceStrategy rebalancedStrategy) {
+        return topMomentumStockRepository.findAllByRebalancedStrategy(rebalancedStrategy);
     }
 
     public Map<Date, List<TopN_MomentumStock>> getTopNStockGroupByRebalencedDate(RebalenceStrategy rebalancedStrategy) {
         Map<Date, List<TopN_MomentumStock>> topNStockGroupByRebalenceDdate=new LinkedHashMap<>();
-        topNStockGroupByRebalenceDdate = getAllTopMomentumStockByRebalenceStrategy(rebalancedStrategy).stream()
+        topNStockGroupByRebalenceDdate = getMomentumStockByRebalenceStrategyBetweenRank(rebalancedStrategy).stream()
                 .sorted(Comparator.comparing(TopN_MomentumStock::getEndDate)) // Ensure ordering by date
                 .collect(Collectors.groupingBy(
                         TopN_MomentumStock::getEndDate, // Key mapper: use endDate as the key
@@ -151,9 +155,8 @@ public class TopMomentumStockService {
                         Collectors.toList()             // Value mapper: list of stocks
                 ));
         topNStockGroupByRebalenceDdate.forEach((date, stocks) -> {
-            System.out.println("\n=======Rebalance Date: " + date);
-            stocks.forEach(stock -> System.out.println("  Stock: " + stock.getStockName() +
-                    "  Rank: " + stock.getRank() + "  Annual Return: " + stock.getPercentageReturn12Months()));
+            System.out.println(STR."=======Rebalance Date: \{date}");
+            stocks.forEach(stock -> System.out.println(STR."  Stock: \{stock.getStockName()}  Rank: \{stock.getRank()}  Annual Return: \{stock.getPercentageReturn12Months()}"));
         });
         return topNStockGroupByRebalenceDdate;
     }
