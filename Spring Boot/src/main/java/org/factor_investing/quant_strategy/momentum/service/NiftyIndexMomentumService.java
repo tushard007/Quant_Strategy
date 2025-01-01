@@ -18,6 +18,18 @@ public class NiftyIndexMomentumService {
     @Autowired
     private TopMomentumStockService topMomentumStockService;
 
+    public Map<String,List<TopN_MomentumStock>> getAllNiftyIndexMomentumStocks(Date endDate) {
+        Map<String,List<TopN_MomentumStock>> niftyIndexMomentumStocks = new LinkedHashMap<>();
+        List<String> niftyIndexList = List.of("Nifty50", "NiftyNext50", "NiftyMidcap150", "NiftySmallcap250", "Nifty500", "Nifty750");
+        for (String indexName : niftyIndexList) {
+            List<TopN_MomentumStock> momentumStocks = getNiftyIndexMomentumStocks(indexName, endDate);
+            niftyIndexMomentumStocks.put(indexName, momentumStocks);
+            log.info("Index:"+indexName+", Momentum Stocks size: {}", momentumStocks.size());
+
+        }
+        return niftyIndexMomentumStocks;
+    }
+
     public List<TopN_MomentumStock> getNiftyIndexMomentumStocks(String indexName, Date endDate) {
         List<String> stockList = getNiftyIndexStockList(indexName);
         return getMomentumStocksList(stockList, endDate);
@@ -63,13 +75,10 @@ public class NiftyIndexMomentumService {
         List<TopN_MomentumStock> momentumStocks = topNStockGroupByRebalenceDdate.get(endDate);
 
 
-        List<TopN_MomentumStock> matchingMomentumStocks = momentumStocks.stream()
+        return momentumStocks.stream()
                 .filter(momentumStock -> stockList.contains(momentumStock.getStockName()))
                 .sorted(Comparator.comparing(TopN_MomentumStock::getPercentageReturn12Months).reversed())
                 .toList();
-
-        log.info("Matching Momentum Stocks size: {}", matchingMomentumStocks.size());
-        return matchingMomentumStocks;
     }
 
 }

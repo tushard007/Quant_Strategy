@@ -63,8 +63,6 @@ public class MomentumStockBackTestService {
                         stock.setBuyPrice(startDatePrice);
                         stock.setSellPrice(endDatePrice);
                     }
-//                    log.info("Stock data:" + stock.getStockName() + " buy Date:" + stock.getBuyDate() + " Buy Price:" + stock.getBuyPrice() + "\n" +
-//                            "Sell Date:" + stock.getSellDate() + " Sell Price:" + stock.getSellPrice() + "\n=======================================");
                     returnCalculationList.add(stock);
                 }
             });

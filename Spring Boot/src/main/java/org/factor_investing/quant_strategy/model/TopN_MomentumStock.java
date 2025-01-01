@@ -27,8 +27,6 @@ public class TopN_MomentumStock{
     public float startDateStockPrice;
     public float endDateStockPrice;
     public int rank;
-    @Enumerated(EnumType.STRING)
-    private StockSignal stockSignal;
     @CreationTimestamp
     private java.util.Date creationDate;
     @UpdateTimestamp
