@@ -2,78 +2,119 @@ import pandas as pd
 import yfinance as yf
 import psycopg
 from datetime import datetime
+import sys
 
-
-# Function to connect to PostgreSQL database
-def connect_db():
-    try:
-        conn = psycopg.connect(
-            dbname="factor_investing",
-            user="tushardesarda",
-            password="",
-            host="localhost",
-            port="5432"
-        )
-        return conn
-    except Exception as e:
-        print(f"Error connecting to database: {e}")
-        return None
-
-
-# Function to create table if it doesn't exist
-def create_table(conn):
-    with conn.cursor() as cursor:
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS stock_price_data (
+def create_stock_price_table(conn):
+    """Create the stock_prices table if it doesn't exist"""
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS stock_prices (
                 id SERIAL PRIMARY KEY,
-                ticker VARCHAR(10),
+                symbol VARCHAR(10),
                 date DATE,
-                closing_price DECIMAL(10, 2) 
-            );
+                open FLOAT,
+                high FLOAT,
+                low FLOAT,
+                close FLOAT,
+                volume BIGINT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (symbol, date)
+            )
         """)
-        conn.commit()
+    conn.commit()
 
+def load_stock_data(csv_path, conn):
+    """
+    Load stock data from CSV file, download price data, and store in database
+    
+    Args:
+        csv_path (str): Path to CSV file containing stock symbols
+        conn: Database connection object
+    """
+    try:
+        # Read symbols from CSV file
+        df_symbols = pd.read_csv(csv_path)
+        if 'symbol' not in df_symbols.columns:
+            raise ValueError("CSV file must contain a 'symbol' column")
+        
+        symbols = df_symbols['symbol'].tolist()
+        print(f"Found {len(symbols)} symbols in CSV file")
+        
+        # Create table if it doesn't exist
+        create_stock_price_table(conn)
+        
+        # Process each symbol
+        for symbol in symbols:
+            try:
+                print(f"Processing {symbol}...")
+                
+                # Download data from Yahoo Finance
+                stock = yf.Ticker(f"{symbol}.NS")
+                df = stock.history(period="2y")
+                
+                if df.empty:
+                    print(f"No data found for {symbol}")
+                    continue
+                
+                # Reset index to make date a column
+                df = df.reset_index()
+                
+                # Insert data into database
+                with conn.cursor() as cur:
+                    for _, row in df.iterrows():
+                        cur.execute("""
+                            INSERT INTO stock_prices (symbol, date, open, high, low, close, volume)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (symbol, date) 
+                            DO UPDATE SET
+                                open = EXCLUDED.open,
+                                high = EXCLUDED.high,
+                                low = EXCLUDED.low,
+                                close = EXCLUDED.close,
+                                volume = EXCLUDED.volume,
+                                created_at = CURRENT_TIMESTAMP
+                        """, (
+                            symbol,
+                            row['Date'].date(),
+                            float(row['Open']),
+                            float(row['High']),
+                            float(row['Low']),
+                            float(row['Close']),
+                            int(row['Volume'])
+                        ))
+                
+                conn.commit()
+                print(f"Successfully loaded data for {symbol}")
+                
+            except Exception as e:
+                print(f"Error processing {symbol}: {str(e)}")
+                conn.rollback()
+                continue
+                
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        sys.exit(1)
 
-# Function to insert data into the database
-def insert_data(conn, ticker, date, closing_price):
-    with conn.cursor() as cursor:
-        cursor.execute("""
-            INSERT INTO stock_price_data (ticker, date, closing_price)
-            VALUES (%s, %s, %s);
-        """, (ticker, date, closing_price))
-        conn.commit()
+def main():
+    # Database connection parameters
+    db_params = {
+        "dbname": "factor_investing",
+        "user": "tushardesarda",
+        "password": "",
+        "host": "localhost",
+        "port": "5432"
+    }
+    
+    try:
+        # Connect to database
+        with psycopg.connect(**db_params) as conn:
+            # Replace with your CSV file path
+            csv_path = "nse_tickers.csv"
+            load_stock_data(csv_path, conn)
+            
+    except Exception as e:
+        print(f"Database connection error: {str(e)}")
+        sys.exit(1)
 
-
-# Main function to fetch stock data and store it in PostgreSQL
-def fetch_and_store_stock_data(csv_file):
-    # Read ticker symbols from CSV file
-    tickers = pd.read_csv(csv_file)['Ticker'].tolist()
-
-    # Connect to the database
-    conn = connect_db()
-    if conn is None:
-        return
-
-    # Create table if it doesn't exist
-    create_table(conn)
-
-    for ticker in tickers:
-        try:
-            # Fetch historical data for the last 30 days
-            stock_price_data = yf.Ticker(ticker + '.NS').history(period='max')  # Append '.NS' for NSE stocks
-
-            # Iterate over the fetched data and insert into database
-            for index, row in stock_price_data.iterrows():
-                insert_data(conn, ticker, index.date(), row['Close'])
-
-            print(f"Data for {ticker} stored successfully.")
-
-        except Exception as e:
-            print(f"Error fetching data for {ticker}: {e}")
-
-    # Close the database connection
-    conn.close()
-
-
-# Execute the program with your CSV file path
-fetch_and_store_stock_data('nse_tickers.csv')
+if __name__ == "__main__":
+    main()
