@@ -2,13 +2,37 @@ import yfinance as yf
 import pandas as pd
 import pandas_ta as ta
 from datetime import datetime
+import logging
+
+# Clear the log file before starting
+with open('supertrend_analysis.log', 'w'):
+    pass
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, 
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Add file handler
+file_handler = logging.FileHandler('supertrend_analysis.log')
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+
+# Add console handler
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+
+# Get the root logger
+logger = logging.getLogger()
+logger.addHandler(file_handler)
+logger.addHandler(console_handler)
 
 def analyze_supertrend(ticker):
     """Analyze a single stock using Supertrend indicator"""
     try:
         # Download stock data
-        stock = yf.Ticker(ticker)
-        df = stock.history(interval='1wk', period='max')  # Get maximum available history
+        stock = yf.Ticker(ticker + ".NS")
+        df = stock.history(interval='1wk', period='5y')  # Get maximum available history
         
         # Calculate Supertrend
         supertrend = df.ta.supertrend(length=9, multiplier=2)
@@ -16,9 +40,9 @@ def analyze_supertrend(ticker):
         # Merge Supertrend results with the original dataframe
         df = pd.concat([df, supertrend], axis=1)
         
-        # Print last 4 weeks of data
-        print(f"\n=== Last 4 Weeks Data for {ticker} ===")
-        print("=" * 80)
+        # Log last 4 weeks of data
+        logging.info(f"\n=== Last 4 Weeks Data for {ticker} ===")
+        logging.info("=" * 80)
         recent_data = df.tail(4)
         for idx, row in recent_data.iterrows():
             date = idx.strftime('%Y-%m-%d')
@@ -28,12 +52,12 @@ def analyze_supertrend(ticker):
             distance = abs(price - supertrend_value)
             distance_percent = (distance / price) * 100
             
-            print(f"Date: {date}")
-            print(f"Close Price: ${price:.2f}")
-            print(f"Supertrend: ${supertrend_value:.2f}")
-            print(f"Trend: {trend}")
-            print(f"Distance to Supertrend: ${distance:.2f} ({distance_percent:.2f}%)")
-            print("-" * 50)
+            logging.info(f"Date: {date}")
+            logging.info(f"Close Price: {price:.2f}")
+            logging.info(f"Supertrend: {supertrend_value:.2f}")
+            logging.info(f"Trend: {trend}")
+            logging.info(f"Distance to Supertrend: {distance:.2f} ({distance_percent:.2f}%)")
+            logging.info("-" * 50)
         
         # Get last week's data for Excel export
         last_week = df.iloc[-1]
@@ -68,7 +92,7 @@ def analyze_supertrend(ticker):
         }
         
     except Exception as e:
-        print(f"Error analyzing {ticker}: {str(e)}")
+        logging.error(f"Error analyzing {ticker}: {str(e)}")
         return {
             'Ticker': ticker,
             'Date': None,
@@ -85,14 +109,14 @@ try:
     tickers_df = pd.read_csv('tickers.csv')
     tickers = tickers_df['Ticker'].tolist()
 except Exception as e:
-    print(f"Error reading CSV file: {str(e)}")
-    print("Please ensure you have a 'tickers.csv' file with a 'Ticker' column")
+    logging.error(f"Error reading CSV file: {str(e)}")
+    logging.error("Please ensure you have a 'tickers.csv' file with a 'Ticker' column")
     exit()
 
 # Analyze all stocks
 results = []
 for ticker in tickers:
-    print(f"\nAnalyzing {ticker}...")
+    logging.info(f"\nAnalyzing {ticker}...")
     result = analyze_supertrend(ticker)
     results.append(result)
 
@@ -106,4 +130,4 @@ output_filename = f'supertrend_analysis_{timestamp}.xlsx'
 # Save to Excel
 results_df.to_excel(output_filename, sheet_name='Supertrend Analysis', index=False)
 
-print(f"\nAnalysis complete! Results saved to '{output_filename}'")
+logging.info(f"\nAnalysis complete! Results saved to '{output_filename}'")
