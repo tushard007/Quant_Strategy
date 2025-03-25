@@ -11,19 +11,33 @@ import java.sql.Date;
 
 @Getter
 @Setter
-@Table(name="stock_price_data")
+@Table(name="stock_prices")
 public class StockPriceData {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
 
-    @Column(name = "ticker")
-    private String stockTicker;
+   @Column(name = "symbol")
+   private String symbol;
 
-    @Column(name = "closing_price")
-    private float stockPrice;
+   @Column(name = "date")
+   private Date date;
 
-    @Column(name = "date")
-    private Date priceDate;
+   @Column(name = "open")
+   private double open;
 
+   @Column(name = "high")
+   private double high;
+
+   @Column(name = "low")
+   private double low;
+
+   @Column(name = "close")
+   private double close;
+
+   @Column(name = "volume")
+   private long volume;
+
+    @Column(name = "created_at", columnDefinition = "timestamp default CURRENT_TIMESTAMP")
+    private java.sql.Timestamp createdAt;
 }

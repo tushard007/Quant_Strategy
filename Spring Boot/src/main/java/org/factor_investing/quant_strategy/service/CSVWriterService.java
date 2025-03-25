@@ -31,7 +31,7 @@ public class CSVWriterService {
             writer.writeNext(headers);
 
             // Find the maximum list size
-            int maxSize = 20;
+            int maxSize = 40;
 
             // Write data rows
             for (int i = 0; i < maxSize; i++) {

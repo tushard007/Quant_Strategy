@@ -12,15 +12,16 @@ import java.util.Set;
 @Repository
 public interface StockPriceDataRepository extends JpaRepository<StockPriceData, Integer> {
 
-    @Query("SELECT DISTINCT sp.stockTicker FROM StockPriceData sp")
-    Set<String> findDistinctByStockTicker();
+    @Query("SELECT DISTINCT sp.symbol FROM StockPriceData sp")
+    Set<String> findDistinctBySymbol();
 
-    @Query("SELECT DISTINCT sp.priceDate FROM StockPriceData sp")
-    Set<Date> findDistinctByPriceDate();
-    StockPriceData findByStockTickerAndPriceDate(String stockTicker,java.sql.Date priceDate);
+    @Query("SELECT DISTINCT sp.date FROM StockPriceData sp")
+    Set<Date> findDistinctByDate();
 
-    @Query("SELECT DISTINCT s.priceDate FROM StockPriceData s " +
-            "WHERE s.priceDate BETWEEN :startDate AND :endDate AND TRIM(TO_CHAR(s.priceDate, 'Day')) = 'Friday' ORDER BY s.priceDate")
+    StockPriceData findBySymbolAndDate(String symbol,java.sql.Date priceDate);
+
+    @Query("SELECT DISTINCT s.date FROM StockPriceData s " +
+            "WHERE s.date BETWEEN :startDate AND :endDate AND TRIM(TO_CHAR(s.date, 'Day')) = 'Friday' ORDER BY s.date")
     Set<java.sql.Date> findDistinctBetweenDateOfEachFriday(@Param("startDate") java.sql.Date startDate, @Param("endDate") java.sql.Date endDate);
 
     @Query(value = "SELECT DISTINCT ON (date_trunc('month', date)) date AS last_date " +

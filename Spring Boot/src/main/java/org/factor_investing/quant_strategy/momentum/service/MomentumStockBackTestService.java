@@ -28,7 +28,7 @@ public class MomentumStockBackTestService {
 
     public void getBackTestingMomentumStrategyData(RebalenceStrategy rebalancedStrategy) {
         List<TopN_MomentumStock> topNStockList = topMomentumStockService.getMomentumStockByRebalenceStrategyBetweenRank(rebalancedStrategy);
-        Set<LocalDate> allUniqueStockPriceDates = DateUtil.convertToLocalDateSet(stockPriceDataRepository.findDistinctByPriceDate());
+        Set<LocalDate> allUniqueStockPriceDates = DateUtil.convertToLocalDateSet(stockPriceDataRepository.findDistinctByDate());
 
         // Get all unique rebalanced dates
         List<Date> distinctRebalancedDates = topNStockList.stream()

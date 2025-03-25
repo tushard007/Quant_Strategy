@@ -53,8 +53,8 @@ public class TopMomentumStockService {
     public List<TopN_MomentumStock> calculateStockReturn(Date rebalenceDate, RebalenceStrategy rebalenceStrategy) {
 
         //Getting All Unique stock price date from database
-        Set<Date> allUniqueStockPriceDates = stockPriceDataRepository.findDistinctByPriceDate();
-        Set<String> allUniqueStockTicker = stockPriceDataRepository.findDistinctByStockTicker();
+        Set<Date> allUniqueStockPriceDates = stockPriceDataRepository.findDistinctByDate();
+        Set<String> allUniqueStockTicker = stockPriceDataRepository.findDistinctBySymbol();
         Set<LocalDate> allUniqueStockPriceLocaleDates = convertToLocalDateSet(allUniqueStockPriceDates);
 
         LocalDate endDate = DateUtil.convertDateToLocalDate(rebalenceDate);

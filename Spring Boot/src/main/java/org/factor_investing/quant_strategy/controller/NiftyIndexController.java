@@ -1,7 +1,5 @@
 package org.factor_investing.quant_strategy.controller;
 
-import com.opencsv.CSVWriter;
-import org.factor_investing.quant_strategy.model.NiftyIndexStock;
 import org.factor_investing.quant_strategy.model.TopN_MomentumStock;
 import org.factor_investing.quant_strategy.momentum.service.NiftyIndexMomentumService;
 import org.factor_investing.quant_strategy.service.CSVWriterService;
@@ -12,11 +10,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.sql.Date;
-import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.Map;
 

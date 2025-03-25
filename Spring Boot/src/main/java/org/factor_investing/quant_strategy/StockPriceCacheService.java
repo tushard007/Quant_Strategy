@@ -32,10 +32,10 @@ public class StockPriceCacheService {
 
         allStockPrices.forEach(stockPrice -> {
             String cacheKey = generateCacheKey(
-                    stockPrice.getStockTicker(),
-                  stockPrice.getPriceDate()
+                    stockPrice.getSymbol(),
+                  stockPrice.getDate()
             );
-            stockPriceCache.put(cacheKey, stockPrice.getStockPrice());
+            stockPriceCache.put(cacheKey, (float) stockPrice.getOpen());
         });
 
         log.info("Preloaded {} stock prices into cache", stockPriceCache.size());
@@ -64,10 +64,10 @@ public class StockPriceCacheService {
 
         savedPrices.forEach(stockPrice -> {
             String cacheKey = generateCacheKey(
-                    stockPrice.getStockTicker(),
-                    stockPrice.getPriceDate()
+                    stockPrice.getSymbol(),
+                    stockPrice.getDate()
             );
-            stockPriceCache.put(cacheKey, stockPrice.getStockPrice());
+            stockPriceCache.put(cacheKey, (float) stockPrice.getClose());
         });
     }
 

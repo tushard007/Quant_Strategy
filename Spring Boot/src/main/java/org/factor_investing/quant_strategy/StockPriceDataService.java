@@ -44,9 +44,9 @@ public class StockPriceDataService {
     }
 
     public Set<String> getUniqueStockTickers() {
-        return stockRepository.findDistinctByStockTicker();
+        return stockRepository.findDistinctBySymbol();
     }
     public Set<Date> getUniqueStockPriceDates() {
-        return stockRepository.findDistinctByPriceDate();
+        return stockRepository.findDistinctByDate();
     }
 }
