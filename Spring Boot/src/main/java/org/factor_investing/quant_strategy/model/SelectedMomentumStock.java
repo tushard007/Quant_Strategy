@@ -3,7 +3,6 @@ package org.factor_investing.quant_strategy.model;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-import org.factor_investing.quant_strategy.momentum.service.TopMomentumStockService;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 

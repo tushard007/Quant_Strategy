@@ -1,7 +1,7 @@
 package org.factor_investing.quant_strategy.controller;
 
 import org.factor_investing.quant_strategy.model.TopN_MomentumStock;
-import org.factor_investing.quant_strategy.momentum.service.NiftyIndexMomentumService;
+import org.factor_investing.quant_strategy.service.NiftyIndexMomentumService;
 import org.factor_investing.quant_strategy.service.CSVWriterService;
 import org.factor_investing.quant_strategy.service.NiftyIndexService;
 import org.springframework.beans.factory.annotation.Autowired;

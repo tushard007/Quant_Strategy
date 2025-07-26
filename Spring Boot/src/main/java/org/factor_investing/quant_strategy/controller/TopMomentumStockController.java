@@ -2,7 +2,7 @@ package org.factor_investing.quant_strategy.controller;
 
 import org.factor_investing.quant_strategy.model.RebalenceStrategy;
 import org.factor_investing.quant_strategy.model.TopN_MomentumStock;
-import org.factor_investing.quant_strategy.momentum.service.TopMomentumStockService;
+import org.factor_investing.quant_strategy.service.TopMomentumStockService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 

@@ -1,9 +1,8 @@
-package org.factor_investing.quant_strategy.momentum.service;
+package org.factor_investing.quant_strategy.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.factor_investing.quant_strategy.model.RebalenceStrategy;
 import org.factor_investing.quant_strategy.model.TopN_MomentumStock;
-import org.factor_investing.quant_strategy.service.NiftyIndexService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 

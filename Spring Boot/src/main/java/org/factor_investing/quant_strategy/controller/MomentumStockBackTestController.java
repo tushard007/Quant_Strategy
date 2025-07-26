@@ -1,7 +1,7 @@
 package org.factor_investing.quant_strategy.controller;
 
 import org.factor_investing.quant_strategy.model.RebalenceStrategy;
-import org.factor_investing.quant_strategy.momentum.service.MomentumStockBackTestService;
+import org.factor_investing.quant_strategy.service.MomentumStockBackTestService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
