@@ -1,21 +1,23 @@
 package org.factor_investing.quant_strategy.controller;
 
 import com.upstox.api.GetHistoricalCandleResponse;
+import jakarta.websocket.server.PathParam;
 import lombok.extern.slf4j.Slf4j;
 import org.factor_investing.quant_strategy.model.NSE_StockMasterData;
+import org.factor_investing.quant_strategy.model.PriceFrequencey;
 import org.factor_investing.quant_strategy.service.UpstoxHistoricalDataService;
 import org.factor_investing.quant_strategy.model.response.JGetHistoricalCandleResponse;
 import org.factor_investing.quant_strategy.util.DateUtil;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.text.ParseException;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @Slf4j
@@ -27,16 +29,40 @@ public class UpstoxHistoricalDataController {
         this.upstoxHistoricalDataService = upstoxHistoricalDataService;
     }
 
-    @GetMapping("/get-weekly-candle-data")
-    private List<JGetHistoricalCandleResponse> getHistoricalWeeklyCandleData() throws ParseException {
+    @GetMapping("/get-candle-data/{timeFrame}")
+    private List<JGetHistoricalCandleResponse> getHistoricalWeeklyCandleData(@PathVariable String timeFrame) throws ParseException {
         List<JGetHistoricalCandleResponse> result = new ArrayList<>();
-        List<NSE_StockMasterData> stockDataList = upstoxHistoricalDataService.getNSEStockData().stream().limit(500).toList();
+        List<NSE_StockMasterData> stockDataList = upstoxHistoricalDataService.getNSEStockData();
+
+        LocalDate currentDate = LocalDate.now();
+        currentDate= DateUtil.getFridayDateIfWeekend(currentDate);
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        String toDate = currentDate.format(formatter);
+
+        LocalDate beforeYearDate =  DateUtil.getDateBeforeYear(currentDate, 1);
+        beforeYearDate = DateUtil.getFridayDateIfWeekend(beforeYearDate);
+        String fromDate = beforeYearDate.format(formatter);
+
 
         for (NSE_StockMasterData stockData : stockDataList) {
             String instrumentKey = STR."NSE_EQ|\{stockData.getIsinNumber()}";
             log.info("Fetching historical candle data for instrument: {}", instrumentKey);
-            // Thread.sleep(3000); // Add 3 seconds delay between API calls
-            GetHistoricalCandleResponse response = upstoxHistoricalDataService.getHistoricalCandleData(instrumentKey, "weeks", 1, "2025-07-01", "2025-01-01");
+            // Sleep for 3 seconds after every 400 calls to avoid rate limiting
+            if (stockDataList.indexOf(stockData) % 400 == 0 && stockDataList.indexOf(stockData) != 0) {
+                try {
+                    Thread.sleep(300); // Sleep for 3 seconds after every 500 calls
+                } catch (InterruptedException e) {
+                    log.error("Thread interrupted while sleeping", e);
+                }
+            }
+            GetHistoricalCandleResponse response =null;
+            if(PriceFrequencey.WEEKLY.equals(PriceFrequencey.valueOf(timeFrame))) {
+                response= upstoxHistoricalDataService.getHistoricalCandleData(instrumentKey, "weeks", 1, toDate, fromDate);
+            }
+            if(PriceFrequencey.DAILY.equals(PriceFrequencey.valueOf(timeFrame))) {
+                response= upstoxHistoricalDataService.getHistoricalCandleData(instrumentKey, "days", 1, toDate, fromDate);
+            }
+
             if (response != null) {
                 log.info("Successfully fetched data for instrument: {}", instrumentKey);
                 result.add(getJavaObjectHistoricalData(response, stockData.getNameOfCompany(), stockData.getSymbol()));
@@ -44,26 +70,11 @@ public class UpstoxHistoricalDataController {
                 log.warn("No data found for instrument: {}", instrumentKey);
             }
         }
-        upstoxHistoricalDataService.saveHistoricalJsonData(result);
+        upstoxHistoricalDataService.saveHistoricalJsonData(result, STR."\{timeFrame}_historical_data");
         return result;
     }
 
-    @GetMapping("/load-historical-json-data")
-    public Map<String, List<JGetHistoricalCandleResponse.CandleData>>  loadHistoricalJsonData() {
-        String filePath = "src/main/resources/json/Weekly_historical_data_20250727_104305.json";
-        Map<String, List<JGetHistoricalCandleResponse.CandleData>>  stockData=new LinkedHashMap<>();
-        List<JGetHistoricalCandleResponse> historicalData = upstoxHistoricalDataService.loadHistoricalJsonData(filePath);
-        if (historicalData != null && !historicalData.isEmpty()) {
-            stockData = historicalData.stream()
-                    .collect(Collectors.toMap(JGetHistoricalCandleResponse::getSymbol, JGetHistoricalCandleResponse::getData));
-            log.info("Created stock data map with {} entries.", stockData.size());
 
-        } else {
-            log.warn("No historical data found in JSON file.");
-        }
-
-        return stockData;
-    }
 
     public JGetHistoricalCandleResponse getJavaObjectHistoricalData(GetHistoricalCandleResponse apiResult, String stockName, String symbol) throws ParseException {
         JGetHistoricalCandleResponse convert = new JGetHistoricalCandleResponse();

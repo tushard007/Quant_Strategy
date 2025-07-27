@@ -92,5 +92,13 @@ public class DateUtil {
         LocalDate localDate = offsetDateTime.toLocalDate();
         return  convertLocalDateToDate(localDate);
     }
-
+    public static LocalDate getFridayDateIfWeekend(LocalDate date) {
+        DayOfWeek day = date.getDayOfWeek();
+        if (day == DayOfWeek.SATURDAY) {
+            return date.minusDays(1);
+        } else if (day == DayOfWeek.SUNDAY) {
+            return date.minusDays(2);
+        }
+        return date;
+    }
 }

@@ -52,8 +52,8 @@ public class UpstoxHistoricalDataService {
         return nseIndexDataService.getAllIndexData();
     }
 
-    public void saveHistoricalJsonData(List<JGetHistoricalCandleResponse> data) {
-        String filePath = jsonUtility.writeToJson(data, "Weekly_historical_data");
+    public void saveHistoricalJsonData(List<JGetHistoricalCandleResponse> data,String prefix) {
+        String filePath = jsonUtility.writeToJson(data, prefix);
         log.info("Data saved to {}", filePath);
     }
 

@@ -22,7 +22,7 @@ public class NSE_StockDataService {
         stockRepository.deleteById(id);
     }
     public List<NSE_StockMasterData> getAllStockData() {
-        return stockRepository.findAll();
+        return stockRepository.findAllBySeriesIs("EQ");
     }
     public void updateStockData(NSE_StockMasterData stockData) {
         if (stockRepository.existsById(stockData.getId())) {
@@ -43,7 +43,7 @@ public class NSE_StockDataService {
         if (stockData != null) {
             stockRepository.delete(stockData);
         } else {
-            throw new IllegalArgumentException("Stock data with symbol " + symbol + " does not exist.");
+            throw new IllegalArgumentException(STR."Stock data with symbol \{symbol} does not exist.");
         }
     }
     public void saveAllStockData(Iterable<NSE_StockMasterData> stockDataList) {

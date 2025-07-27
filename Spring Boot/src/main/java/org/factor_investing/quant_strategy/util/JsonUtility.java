@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -49,7 +50,7 @@ public class JsonUtility {
 
             // Generate filename with priceDate
             String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-            String filePath = BASE_PATH + prefix + "_" + timestamp + ".json";
+            String filePath = STR."\{BASE_PATH}\{prefix}.json";
 
             // Write JSON to file
             objectWriter.writeValue(new File(filePath), data);
@@ -76,5 +77,36 @@ public class JsonUtility {
             log.error("Failed to read JSON file from {}: {}", filePath, e.getMessage());
             throw new RuntimeException("Error reading JSON file", e);
         }
+    }
+
+    /**
+     * If a JSON file has data, it removes its content while keeping the file intact.
+     */
+    public Boolean clearJsonDataInFiles() {
+        Boolean isContentDeleted = null;
+        try {
+            isContentDeleted = false;
+            File directory = new File(BASE_PATH);
+            if (directory.exists() && directory.isDirectory()) {
+                for (File file : directory.listFiles()) {
+                    if (file.isFile() && file.getName().endsWith(".json")) {
+                        if (file.length() > 0) {
+                            try (FileWriter writer = new FileWriter(file, false)) {
+                                writer.write("");
+                            }
+                            log.info("Cleared data in JSON file: {}", file.getAbsolutePath());
+                            isContentDeleted = true;
+                        } else {
+                            log.info("JSON file already empty: {}", file.getAbsolutePath());
+                        }
+                    }
+                }
+            } else {
+                log.info("Directory does not exist: {}", BASE_PATH);
+            }
+        } catch (IOException e) {
+            log.error("Error clearing JSON data in files: {}", e.getMessage());
+        }
+        return isContentDeleted;
     }
 }
