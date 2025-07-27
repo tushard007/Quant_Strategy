@@ -1,8 +1,10 @@
 package org.factor_investing.quant_strategy.model.response;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
+import java.util.Date;
 import java.util.List;
 
 @Data
@@ -10,24 +12,17 @@ public class JGetHistoricalCandleResponse {
     @JsonProperty("status")
     private String status;
 
-    String nameOfCompany;
+    String fullName;
+    String symbol;
     @JsonProperty("data")
     private List<CandleData> data;
 
-//    public JGetHistoricalCandleResponse(String timeStamp, double v, double v1, double v2, double v3, long l) {
-//    }
-//
-//    public JGetHistoricalCandleResponse() {
-//
-//    }
 
     @Data
     public static class CandleData {
 
-
-
-        @JsonProperty("timestamp")
-        private String timestamp;
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
+        private Date priceDate;
 
         @JsonProperty("open")
         private Double open;

@@ -1,4 +1,4 @@
-package org.factor_investing.quant_strategy;
+package org.factor_investing.quant_strategy.service;
 
 import lombok.Getter;
 import lombok.Setter;

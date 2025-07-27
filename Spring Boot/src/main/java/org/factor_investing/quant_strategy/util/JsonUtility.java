@@ -10,6 +10,7 @@ import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 @Slf4j
 @Component
@@ -18,12 +19,19 @@ public class JsonUtility {
     private static final String BASE_PATH = "src/main/resources/json/";
     private final ObjectMapper objectMapper;
     private final ObjectWriter objectWriter;
+    private final ObjectMapper createObjectMapper = createObjectMapper();
+
 
     public JsonUtility() {
         this.objectMapper = new ObjectMapper();
         this.objectWriter = objectMapper.writerWithDefaultPrettyPrinter();
     }
 
+    public static ObjectMapper createObjectMapper() {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.registerModule(new JavaTimeModule());
+        return mapper;
+    }
     /**
      * Write any object to a JSON file
      * @param data Object to be written
@@ -39,7 +47,7 @@ public class JsonUtility {
                 directory.mkdirs();
             }
 
-            // Generate filename with timestamp
+            // Generate filename with priceDate
             String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
             String filePath = BASE_PATH + prefix + "_" + timestamp + ".json";
 
@@ -63,7 +71,7 @@ public class JsonUtility {
      */
     public <T> T readFromJson(String filePath, TypeReference<T> typeReference) {
         try {
-            return objectMapper.readValue(new File(filePath), typeReference);
+            return createObjectMapper.readValue(new File(filePath), typeReference);
         } catch (IOException e) {
             log.error("Failed to read JSON file from {}: {}", filePath, e.getMessage());
             throw new RuntimeException("Error reading JSON file", e);

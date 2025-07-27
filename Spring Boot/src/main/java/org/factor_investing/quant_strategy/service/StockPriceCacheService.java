@@ -1,4 +1,4 @@
-package org.factor_investing.quant_strategy;
+package org.factor_investing.quant_strategy.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.factor_investing.quant_strategy.model.StockPriceData;

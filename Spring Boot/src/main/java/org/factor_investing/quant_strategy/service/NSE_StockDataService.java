@@ -28,7 +28,7 @@ public class NSE_StockDataService {
         if (stockRepository.existsById(stockData.getId())) {
             stockRepository.save(stockData);
         } else {
-            throw new IllegalArgumentException("Stock data with ID " + stockData.getId() + " does not exist.");
+            throw new IllegalArgumentException(STR."Stock data with ID \{stockData.getId()} does not exist.");
         }
     }
     public NSE_StockMasterData getStockDataBySymbol(String symbol) {

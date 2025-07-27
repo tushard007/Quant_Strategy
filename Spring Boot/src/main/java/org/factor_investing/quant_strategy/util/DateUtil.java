@@ -1,10 +1,8 @@
 package org.factor_investing.quant_strategy.util;
+
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.time.DayOfWeek;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
@@ -48,8 +46,9 @@ public class DateUtil {
     public static LocalDate convertDateToLocalDate(Date date) {
         return Instant.ofEpochMilli(date.getTime()).atZone(ZoneId.systemDefault()).toLocalDate();
     }
+
     public static Date convertLocalDateToDate(LocalDate localDate) throws ParseException {
-        return  new SimpleDateFormat("yyyy-MM-dd").parse(localDate.toString());
+        return new SimpleDateFormat("yyyy-MM-dd").parse(localDate.toString());
     }
 
     public static LocalDate findNearestDate(Set<LocalDate> dateSet, LocalDate inputDate) {
@@ -65,6 +64,7 @@ public class DateUtil {
         }
         return nearestDate;
     }
+
     public static Set<LocalDate> convertToLocalDateSet(Set<Date> dateSet) {
         Set<LocalDate> localDateSet = new HashSet<>();
         for (Date date : dateSet) {
@@ -86,4 +86,11 @@ public class DateUtil {
         }
         return null; // No next date found
     }
+
+    public static Date timeStampToDate(String timeStamp) throws ParseException {
+        OffsetDateTime offsetDateTime = OffsetDateTime.parse(timeStamp);
+        LocalDate localDate = offsetDateTime.toLocalDate();
+        return  convertLocalDateToDate(localDate);
+    }
+
 }

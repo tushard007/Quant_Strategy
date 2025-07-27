@@ -23,6 +23,6 @@ public class NSE_StockMasterData {
     private String isinNumber;
 
     @UpdateTimestamp
-    @Column(name = "updated_at", columnDefinition = "timestamp default CURRENT_TIMESTAMP")
+    @Column(name = "updated_at", columnDefinition = "priceDate default CURRENT_TIMESTAMP")
     private java.sql.Timestamp updatedAt;
 }
