@@ -3,7 +3,9 @@ package org.factor_investing.quant_strategy.controller;
 import com.upstox.api.GetHistoricalCandleResponse;
 import jakarta.websocket.server.PathParam;
 import lombok.extern.slf4j.Slf4j;
+import org.factor_investing.quant_strategy.model.NSE_ETFMasterData;
 import org.factor_investing.quant_strategy.model.NSE_StockMasterData;
+import org.factor_investing.quant_strategy.model.NseDataType;
 import org.factor_investing.quant_strategy.model.PriceFrequencey;
 import org.factor_investing.quant_strategy.service.UpstoxHistoricalDataService;
 import org.factor_investing.quant_strategy.model.response.JGetHistoricalCandleResponse;
@@ -29,11 +31,9 @@ public class UpstoxHistoricalDataController {
         this.upstoxHistoricalDataService = upstoxHistoricalDataService;
     }
 
-    @GetMapping("/get-candle-data/{timeFrame}")
-    private List<JGetHistoricalCandleResponse> getHistoricalWeeklyCandleData(@PathVariable String timeFrame) throws ParseException {
+    @GetMapping("/get-candle-data/{timeFrame}/{nseDataType}")
+    private List<JGetHistoricalCandleResponse> getHistoricalWeeklyCandleData(@PathVariable String timeFrame,@PathVariable String nseDataType) throws ParseException {
         List<JGetHistoricalCandleResponse> result = new ArrayList<>();
-        List<NSE_StockMasterData> stockDataList = upstoxHistoricalDataService.getNSEStockData();
-
         LocalDate currentDate = LocalDate.now();
         currentDate= DateUtil.getFridayDateIfWeekend(currentDate);
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
@@ -43,34 +43,71 @@ public class UpstoxHistoricalDataController {
         beforeYearDate = DateUtil.getFridayDateIfWeekend(beforeYearDate);
         String fromDate = beforeYearDate.format(formatter);
 
+        if(NseDataType.STOCK.equals(NseDataType.valueOf(nseDataType))) {
+            List<NSE_StockMasterData> stockDataList = upstoxHistoricalDataService.getNSEStockData();
+            for (NSE_StockMasterData stockData : stockDataList) {
+                String instrumentKey = STR."NSE_EQ|\{stockData.getIsinNumber()}";
+                String stockName = stockData.getNameOfCompany();
+                log.info("Fetching historical candle data for stock: {}", stockName);
+                // Sleep for 3 seconds after every 400 calls to avoid rate limiting
+                if (stockDataList.indexOf(stockData) % 400 == 0 && stockDataList.indexOf(stockData) != 0) {
+                    try {
+                        Thread.sleep(300); // Sleep for 3 seconds after every 500 calls
+                    } catch (InterruptedException e) {
+                        log.error("Thread interrupted while sleeping", e);
+                    }
+                }
+                GetHistoricalCandleResponse response =null;
+                if(PriceFrequencey.WEEKLY.equals(PriceFrequencey.valueOf(timeFrame))) {
+                    response= upstoxHistoricalDataService.getHistoricalCandleData(instrumentKey, "weeks", 1, toDate, fromDate);
+                }
+                if(PriceFrequencey.DAILY.equals(PriceFrequencey.valueOf(timeFrame))) {
+                    response= upstoxHistoricalDataService.getHistoricalCandleData(instrumentKey, "days", 1, toDate, fromDate);
+                }
 
-        for (NSE_StockMasterData stockData : stockDataList) {
-            String instrumentKey = STR."NSE_EQ|\{stockData.getIsinNumber()}";
-            log.info("Fetching historical candle data for instrument: {}", instrumentKey);
-            // Sleep for 3 seconds after every 400 calls to avoid rate limiting
-            if (stockDataList.indexOf(stockData) % 400 == 0 && stockDataList.indexOf(stockData) != 0) {
-                try {
-                    Thread.sleep(300); // Sleep for 3 seconds after every 500 calls
-                } catch (InterruptedException e) {
-                    log.error("Thread interrupted while sleeping", e);
+                if (response != null) {
+                    log.info("Successfully fetched data for stock: {}", stockName);
+                    result.add(getJavaObjectHistoricalData(response, stockData.getNameOfCompany(), stockData.getSymbol()));
+                } else {
+                    log.warn("No data found for stock: {}", stockName);
                 }
             }
-            GetHistoricalCandleResponse response =null;
-            if(PriceFrequencey.WEEKLY.equals(PriceFrequencey.valueOf(timeFrame))) {
-                response= upstoxHistoricalDataService.getHistoricalCandleData(instrumentKey, "weeks", 1, toDate, fromDate);
-            }
-            if(PriceFrequencey.DAILY.equals(PriceFrequencey.valueOf(timeFrame))) {
-                response= upstoxHistoricalDataService.getHistoricalCandleData(instrumentKey, "days", 1, toDate, fromDate);
-            }
+        }
+        if (NseDataType.INDEX.equals(NseDataType.valueOf(nseDataType))) {
+        List<NSE_ETFMasterData>  indexDataList = upstoxHistoricalDataService.getNSEIndexData();
+            for (NSE_ETFMasterData indexData : indexDataList) {
+                String instrumentKey = STR."NSE_EQ|\{indexData.getIsinNumber()}";
+                String stockName = indexData.getSecurityName();
+                log.info("Fetching historical candle data for Index: {}", stockName);
+                // Sleep for 3 seconds after every 100 calls to avoid rate limiting
+                if (indexDataList.indexOf(indexData) % 100 == 0 && indexDataList.indexOf(indexData) != 0) {
+                    try {
+                        Thread.sleep(300); // Sleep for 3 seconds after every 500 calls
+                    } catch (InterruptedException e) {
+                        log.error("Thread interrupted while sleeping", e);
+                    }
+                }
+                GetHistoricalCandleResponse response =null;
+                if(PriceFrequencey.WEEKLY.equals(PriceFrequencey.valueOf(timeFrame))) {
+                    response= upstoxHistoricalDataService.getHistoricalCandleData(instrumentKey, "weeks", 1, toDate, fromDate);
+                }
+                if(PriceFrequencey.DAILY.equals(PriceFrequencey.valueOf(timeFrame))) {
+                    response= upstoxHistoricalDataService.getHistoricalCandleData(instrumentKey, "days", 1, toDate, fromDate);
+                }
 
-            if (response != null) {
-                log.info("Successfully fetched data for instrument: {}", instrumentKey);
-                result.add(getJavaObjectHistoricalData(response, stockData.getNameOfCompany(), stockData.getSymbol()));
-            } else {
-                log.warn("No data found for instrument: {}", instrumentKey);
+                if (response != null) {
+                    log.info("Successfully fetched data for index: {}", stockName);
+                    result.add(getJavaObjectHistoricalData(response, indexData.getSecurityName(), indexData.getSymbol()));
+                } else {
+                    log.warn("No data found for index: {}", stockName);
+                }
             }
         }
-        upstoxHistoricalDataService.saveHistoricalJsonData(result, STR."\{timeFrame}_historical_data");
+
+
+
+
+        upstoxHistoricalDataService.saveHistoricalJsonData(result, STR."\{timeFrame}_\{nseDataType}_historical_data");
         return result;
     }
 

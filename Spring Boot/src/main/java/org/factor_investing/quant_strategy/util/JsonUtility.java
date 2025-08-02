@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
@@ -72,7 +73,8 @@ public class JsonUtility {
      */
     public <T> T readFromJson(String filePath, TypeReference<T> typeReference) {
         try {
-            return createObjectMapper.readValue(new File(filePath), typeReference);
+            ClassPathResource resource = new ClassPathResource(filePath);
+            return createObjectMapper.readValue(resource.getInputStream(), typeReference);
         } catch (IOException e) {
             log.error("Failed to read JSON file from {}: {}", filePath, e.getMessage());
             throw new RuntimeException("Error reading JSON file", e);

@@ -47,6 +47,7 @@ public class DateUtil {
         return Instant.ofEpochMilli(date.getTime()).atZone(ZoneId.systemDefault()).toLocalDate();
     }
 
+
     public static Date convertLocalDateToDate(LocalDate localDate) throws ParseException {
         return new SimpleDateFormat("yyyy-MM-dd").parse(localDate.toString());
     }
@@ -100,5 +101,10 @@ public class DateUtil {
             return date.minusDays(2);
         }
         return date;
+    }
+    //convert string to date
+    public static Date stringToDate(String dateString) throws ParseException {
+        SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
+        return formatter.parse(dateString);
     }
 }
