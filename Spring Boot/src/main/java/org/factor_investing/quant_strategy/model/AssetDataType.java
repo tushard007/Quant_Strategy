@@ -1,7 +1,6 @@
 package org.factor_investing.quant_strategy.model;
 
-public enum StockSignal {
-    Buy,
-    Hold,
-    Sell
+public enum AssetDataType {
+    STOCK,
+    INDEX,
 }

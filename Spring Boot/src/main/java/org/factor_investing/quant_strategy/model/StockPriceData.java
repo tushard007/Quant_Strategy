@@ -38,6 +38,6 @@ public class StockPriceData {
    @Column(name = "volume")
    private long volume;
 
-    @Column(name = "created_at", columnDefinition = "timestamp default CURRENT_TIMESTAMP")
+    @Column(name = "created_at", columnDefinition = "priceDate default CURRENT_TIMESTAMP")
     private java.sql.Timestamp createdAt;
 }
