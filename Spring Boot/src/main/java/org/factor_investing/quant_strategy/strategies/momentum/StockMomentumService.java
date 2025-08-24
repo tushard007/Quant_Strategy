@@ -34,7 +34,7 @@ public class StockMomentumService {
      */
     public MomentumResult calculateMomentum() {
         try {
-            Map<String, List<OHLCV>> stockData = stockPriceCacheService.getAllStockPriceData();
+            Map<String, List<OHLCV>> stockData = stockPriceCacheService.getCachedAllStockPriceData();
             validateInput(stockData);
 
             List<StockMomentum> allResults = new ArrayList<>();

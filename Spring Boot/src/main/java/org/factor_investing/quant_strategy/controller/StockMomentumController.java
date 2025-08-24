@@ -23,7 +23,7 @@ public class StockMomentumController {
     /**
      * Calculate momentum for all stocks
      */
-    @PostMapping("/calculate")
+    @PostMapping("/calculate-initial-momentum-data")
     public ResponseEntity<MomentumResult> calculateMomentum() {
         MomentumResult result = momentumService.calculateMomentum();
 
@@ -35,17 +35,8 @@ public class StockMomentumController {
     }
 
     /**
-     * Get only momentum stock names (top stocks only)
+     * Update momentum rankings in the database
      */
-    @PostMapping("/names")
-    public ResponseEntity<List<String>> getMomentumStockNames() {
-        try {
-            List<String> stockNames = momentumService.getMomentumStocksList();
-            return ResponseEntity.ok(stockNames);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
-        }
-    }
 @PostMapping("/UpdateRankings")
     public ResponseEntity<String> updateMomentumRankings() {
         try {
@@ -53,31 +44,6 @@ public class StockMomentumController {
             return ResponseEntity.ok("Momentum rankings updated successfully.");
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Failed to update momentum rankings.");
-        }
-    }
-
-    /**
-     * Get momentum analysis summary
-     */
-    @PostMapping("/summary")
-    public ResponseEntity<Map<String, Object>> getMomentumSummary() {
-
-        try {
-            MomentumResult result = momentumService.calculateMomentum();
-
-            if (result.isValid()) {
-                Map<String, Object> summary = Map.of(
-                        "totalAnalyzed", result.getTotalAnalyzed(),
-                        "qualifiedCount", result.getQualifiedCount(),
-                        "topStockCount", Math.min(result.getQualifiedCount(), MomentumConstants.TOP_NUMBER_MOMENTUM_STOCKS),
-                        "topStocks", result.getTopStockNames(),
-                        "bestStock", result.getQualifiedStocks().getFirst());
-                return ResponseEntity.ok(summary);
-            } else {
-                return ResponseEntity.badRequest().build();
-            }
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
         }
     }
 }
