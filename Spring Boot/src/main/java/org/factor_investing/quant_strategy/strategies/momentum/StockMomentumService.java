@@ -1,6 +1,8 @@
 package org.factor_investing.quant_strategy.strategies.momentum;
 
 import lombok.extern.slf4j.Slf4j;
+import org.factor_investing.quant_strategy.model.TopN_MomentumStock;
+import org.factor_investing.quant_strategy.repository.TopMomentumStockRepository;
 import org.factor_investing.quant_strategy.service.StockPriceCacheService;
 import org.factor_investing.quant_strategy.strategies.OHLCV;
 import org.factor_investing.quant_strategy.util.DateUtil;
@@ -10,7 +12,9 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.*;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.factor_investing.quant_strategy.util.DateUtil.convertToLocalDateSet;
 
@@ -20,6 +24,8 @@ public class StockMomentumService {
 
     @Autowired
     private StockPriceCacheService stockPriceCacheService;
+    @Autowired
+    private TopMomentumStockRepository topMomentumStockRepository;
 
     /**
      * Calculate momentum for all stocks in the provided data
@@ -32,6 +38,7 @@ public class StockMomentumService {
             validateInput(stockData);
 
             List<StockMomentum> allResults = new ArrayList<>();
+            List<TopN_MomentumStock> topN_momentumStocksList = new ArrayList<>();
             int count = 0;
             for (Map.Entry<String, List<OHLCV>> entry : stockData.entrySet()) {
                 String stockName = entry.getKey();
@@ -42,14 +49,25 @@ public class StockMomentumService {
                     StockMomentum momentum = calculateStockMomentum(stockName, ohlcData);
                     if (momentum != null) {
                         allResults.add(momentum);
+                        if (momentum.isQualifiesForMomentum()) {
+                            TopN_MomentumStock topN_momentumStock = new TopN_MomentumStock();
+                            topN_momentumStock.setStockName(momentum.getStockName());
+                            topN_momentumStock.setPercentageReturn12Months(momentum.getOneYearReturn());
+                            topN_momentumStock.setPercentageReturn6Months(momentum.getSixMonthReturn());
+                            topN_momentumStock.setPercentageReturn3Months(momentum.getThreeMonthReturn());
+                            topN_momentumStock.setStrategyRunDate(java.sql.Date.valueOf(momentum.getStrategyRunDate()));
+                            topN_momentumStocksList.add(topN_momentumStock);
+                        }
+                        log.info("Calculated momentum: {}", momentum);
                     }
                 } catch (Exception e) {
                     // Log error but continue with other stocks
                     System.err.println(STR."Error calculating momentum for \{stockName}: \{e.getMessage()}");
                 }
-                log.info("Calculation in progress remaining stock to process: {}", stockData.size()-count);
+                log.info("Calculation in progress remaining stock to process: {}", stockData.size() - count);
             }
-
+            if (!topN_momentumStocksList.isEmpty())
+                topMomentumStockRepository.saveAll(topN_momentumStocksList);
             // Sort by 1-year return (descending)
             List<StockMomentum> sortedResults = allResults.stream()
                     .sorted(Comparator.comparingDouble(StockMomentum::getOneYearReturn).reversed())
@@ -57,10 +75,10 @@ public class StockMomentumService {
 
             // Filter qualified stocks
             List<StockMomentum> qualifiedStocks = sortedResults.stream()
-                    .filter(StockMomentum::qualifiesForMomentum)
+                    .filter(StockMomentum::isQualifiesForMomentum)
                     .collect(Collectors.toList());
 
-            // Get top stock names
+            // Get top stock names...TODO:modify after full implementation based on TotalRanking
             List<String> topStockNames = qualifiedStocks.stream()
                     .limit(MomentumConstants.TOP_NUMBER_MOMENTUM_STOCKS)
                     .map(StockMomentum::getStockName)
@@ -122,7 +140,7 @@ public class StockMomentumService {
             if (currentPrice == null || previous1YearPrice == null || previous6MonthPrice == null || previous3MonthPrice == null) {
                 return null;
             } else {
-                log.info("\n********** currentPrice:{}, previous1YearPrice:{}, previous6MonthPrice:{}, previous3MonthPrice:{}", currentPrice, previous1YearPrice, previous6MonthPrice, previous3MonthPrice);
+                log.info("==============/n currentPrice:{}, previous1YearPrice:{}, previous6MonthPrice:{}, previous3MonthPrice:{}", currentPrice, previous1YearPrice, previous6MonthPrice, previous3MonthPrice);
             }
 
             // Calculate returns for different periods
@@ -130,38 +148,72 @@ public class StockMomentumService {
             Float sixMonthReturn = ReturnCalculationUtils.percentReturn(previous6MonthPrice.floatValue(), currentPrice.floatValue());
             Float threeMonthReturn = ReturnCalculationUtils.percentReturn(previous3MonthPrice.floatValue(), currentPrice.floatValue());
             if (oneYearReturn > 0 && sixMonthReturn > 0 && threeMonthReturn > 0) {
-                log.info("oneYearReturn:{}, sixMonthReturn:{}, threeMonthReturn:{}\n************", oneYearReturn, sixMonthReturn, threeMonthReturn);
+                log.info("oneYearReturn:{}, sixMonthReturn:{}, threeMonthReturn:{}\n====================", oneYearReturn, sixMonthReturn, threeMonthReturn);
+                return new StockMomentum(stockName, oneYearReturn, sixMonthReturn, threeMonthReturn, currentDate);
             }
-
-            return new StockMomentum(stockName, oneYearReturn, sixMonthReturn, threeMonthReturn);
+            else {
+                return null;
+            }
         } else {
-            log.error(STR."Insufficient data points for \{stockName}. Required: \{MomentumConstants.MIN_DATA_POINTS}, Provided: \{ohlcData.size()}");
-            return null;
+                log.error(STR."Insufficient data points for \{stockName}. Required: \{MomentumConstants.MIN_DATA_POINTS}, Provided: \{ohlcData.size()}");
+                return null;
+            }
         }
 
-    }
-
-
-    /**
-     * Get the most recent price data
-     */
-    private double getMostRecentPrice(String stockName, LocalDate priceDate) {
-        return stockPriceCacheService.getStockClosingPriceBySymbolAndDate(stockName, priceDate);
-
-    }
-
-    private void validateInput(Map<String, List<OHLCV>> stockData) {
-        if (stockData == null || stockData.isEmpty()) {
-            throw new IllegalArgumentException("Stock data cannot be null or empty");
+        /**
+         * Get the most recent price data
+         */
+        private double getMostRecentPrice (String stockName, LocalDate priceDate){
+            return stockPriceCacheService.getStockClosingPriceBySymbolAndDate(stockName, priceDate);
         }
 
-        for (Map.Entry<String, List<OHLCV>> entry : stockData.entrySet()) {
-            String stockName = entry.getKey();
-            List<OHLCV> ohlcvList = entry.getValue();
+        public void assignRanks () {
+            List<TopN_MomentumStock> stocks = topMomentumStockRepository.findAll();
+            // Rank by 12 months return
+            rankStocks(stocks, Comparator.comparing(TopN_MomentumStock::getPercentageReturn12Months).reversed(),
+                    TopN_MomentumStock::setRank12Months);
 
-            if (stockName == null || stockName.trim().isEmpty()) {
-                throw new IllegalArgumentException("Stock name cannot be null or empty");
+            // Rank by 6 months return
+            rankStocks(stocks, Comparator.comparing(TopN_MomentumStock::getPercentageReturn6Months).reversed(),
+                    TopN_MomentumStock::setRank6Months);
+
+            // Rank by 3 months return
+            rankStocks(stocks, Comparator.comparing(TopN_MomentumStock::getPercentageReturn3Months).reversed(),
+                    TopN_MomentumStock::setRank3Months);
+
+            // Calculate total rank score (lower is better since rank 1 is top)
+            stocks.forEach(stock -> {
+                int totalRank = stock.getRank12Months() + stock.getRank6Months() + stock.getRank3Months();
+                stock.setTotalRankScore(totalRank);
+            });
+            // Save updated ranks back to the database
+            topMomentumStockRepository.saveAll(stocks);
+            log.info("Momentum rankings updated successfully.");
+        }
+
+        private void rankStocks (List < TopN_MomentumStock > stocks,
+                Comparator < TopN_MomentumStock > comparator,
+                BiConsumer < TopN_MomentumStock, Integer > rankSetter){
+            // Sort + assign ranks (1-based)
+            List<TopN_MomentumStock> sorted = stocks.stream()
+                    .sorted(comparator)
+                    .toList();
+
+            IntStream.range(0, sorted.size())
+                    .forEach(i -> rankSetter.accept(sorted.get(i), i + 1));
+        }
+
+        private void validateInput (Map < String, List < OHLCV >> stockData){
+            if (stockData == null || stockData.isEmpty()) {
+                throw new IllegalArgumentException("Stock data cannot be null or empty");
+            }
+            for (Map.Entry<String, List<OHLCV>> entry : stockData.entrySet()) {
+                String stockName = entry.getKey();
+                List<OHLCV> ohlcvList = entry.getValue();
+
+                if (stockName == null || stockName.trim().isEmpty()) {
+                    throw new IllegalArgumentException("Stock name cannot be null or empty");
+                }
             }
         }
     }
-}

@@ -9,7 +9,9 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.sql.Date;
 
 @Entity
-@Table(name = "t_top_momentum_stock")
+@Table(name = "t_top_momentum_stock",uniqueConstraints = {
+@UniqueConstraint(columnNames = {"stockName", "StrategyRunDate"})
+})
 @Getter
 @Setter
 public class TopN_MomentumStock{
@@ -21,7 +23,10 @@ public class TopN_MomentumStock{
     public float percentageReturn6Months;
     public float percentageReturn3Months;
     public Date StrategyRunDate;
-    public int rank;
+    public int Rank12Months;
+    public int Rank6Months;
+    public int Rank3Months;
+    public int TotalRankScore;
     @CreationTimestamp
     private java.util.Date creationDate;
     @UpdateTimestamp

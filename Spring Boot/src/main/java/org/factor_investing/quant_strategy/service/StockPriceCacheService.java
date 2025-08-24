@@ -1,7 +1,6 @@
 package org.factor_investing.quant_strategy.service;
 
 import lombok.extern.slf4j.Slf4j;
-import org.factor_investing.quant_strategy.model.StockPriceDataMapper;
 import org.factor_investing.quant_strategy.model.StockPricesJson;
 import org.factor_investing.quant_strategy.strategies.OHLCV;
 import org.factor_investing.quant_strategy.util.DateUtil;
@@ -11,12 +10,10 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
-import java.sql.Date;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,32 +24,18 @@ public class StockPriceCacheService {
     @Autowired
     private StockDataService stockDataService;
 
+
+
     @EventListener(ApplicationStartedEvent.class)
-    @Cacheable(value = "stockPrices", key = "#symbol")
     public Map<String, List<OHLCV>> getAllStockPriceData() {
         List<StockPricesJson> stockPricesJsonList = stockDataService.getAllStockData();
-        Map<String, List<OHLCV>> stockPriceDataMap = stockPricesJsonList.stream().limit(10)
+        Map<String, List<OHLCV>> stockPriceDataMap = stockPricesJsonList.stream()
                 .collect(Collectors.toMap(
                         stockPrice -> stockPrice.getNseStockMasterData().getSymbol(),
                         StockPricesJson::getOhlcvData
                 ));
         log.info("Retrieved all stock price data with {} entries.", stockPriceDataMap.size());
         return stockPriceDataMap;
-
-    }
-
-    public void getAllStockPriceDataMapper() {
-        Map<String, List<OHLCV>> allStockPriceData = getAllStockPriceData();
-        // Convert to StockPriceDataMapper for further processing if neededst
-        AtomicReference<StockPriceDataMapper> stockPriceDataMapper = null;
-        allStockPriceData.forEach((key, value) -> {
-            String symbol = key;
-            value.forEach(ohlcv -> {
-                double close = ohlcv.getOpen();
-                Date date = (Date) ohlcv.getDate();
-                stockPriceDataMapper.set(new StockPriceDataMapper(symbol, date, close));
-            });
-        });
 
     }
 

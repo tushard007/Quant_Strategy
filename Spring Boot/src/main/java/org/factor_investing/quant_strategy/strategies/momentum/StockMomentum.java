@@ -1,23 +1,30 @@
 package org.factor_investing.quant_strategy.strategies.momentum;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
-
+@Getter
+@Setter
 public class StockMomentum {
+
     private final String stockName;
     private final Float oneYearReturn;
     private final Float sixMonthReturn;
     private final Float threeMonthReturn;
     private final boolean qualifiesForMomentum;
+    private final LocalDate StrategyRunDate;
 
-    public StockMomentum(String stockName, Float oneYearReturn, Float sixMonthReturn, Float threeMonthReturn) {
+    public StockMomentum(String stockName, Float oneYearReturn, Float sixMonthReturn, Float threeMonthReturn, LocalDate date) {
         this.stockName = stockName;
         this.oneYearReturn = oneYearReturn;
         this.sixMonthReturn = sixMonthReturn;
         this.threeMonthReturn = threeMonthReturn;
         this.qualifiesForMomentum = calculateQualification();
+        this.StrategyRunDate = date;
     }
 
     private boolean calculateQualification() {
@@ -26,12 +33,6 @@ public class StockMomentum {
                 threeMonthReturn > MomentumConstants.MINIMUM_RETURN_THRESHOLD &&
                 sixMonthReturn > MomentumConstants.MINIMUM_RETURN_THRESHOLD;
     }
-
-    public String getStockName() { return stockName; }
-    public double getOneYearReturn() { return oneYearReturn; }
-    public double getSixMonthReturn() { return sixMonthReturn; }
-    public double getThreeMonthReturn() { return threeMonthReturn; }
-    public boolean qualifiesForMomentum() { return qualifiesForMomentum; }
 
     @Override
     public String toString() {

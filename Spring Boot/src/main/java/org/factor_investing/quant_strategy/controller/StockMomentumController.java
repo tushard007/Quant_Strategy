@@ -46,7 +46,15 @@ public class StockMomentumController {
             return ResponseEntity.badRequest().build();
         }
     }
-
+@PostMapping("/UpdateRankings")
+    public ResponseEntity<String> updateMomentumRankings() {
+        try {
+            momentumService.assignRanks();
+            return ResponseEntity.ok("Momentum rankings updated successfully.");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Failed to update momentum rankings.");
+        }
+    }
 
     /**
      * Get momentum analysis summary
