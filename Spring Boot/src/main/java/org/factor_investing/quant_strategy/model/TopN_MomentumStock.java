@@ -17,29 +17,13 @@ public class TopN_MomentumStock{
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     public Integer id;
     public String stockName;
-    @Enumerated(EnumType.STRING)
-    public RebalenceStrategy rebalancedStrategy;
     public float percentageReturn12Months;
     public float percentageReturn6Months;
     public float percentageReturn3Months;
-    public Date startDate;
-    public Date endDate;
-    public float startDateStockPrice;
-    public float endDateStockPrice;
+    public Date StrategyRunDate;
     public int rank;
     @CreationTimestamp
     private java.util.Date creationDate;
     @UpdateTimestamp
     private java.util.Date modificationDate;
-
-    @Transient
-    private java.sql.Date buyDate;
-    @Transient
-    private java.sql.Date sellDate;
-    @Transient
-    private float buyPrice;
-    @Transient
-    private float sellPrice;
-    @Transient
-    private String strategyRunningMonth;
 }
