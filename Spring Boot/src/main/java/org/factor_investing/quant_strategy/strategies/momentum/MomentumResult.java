@@ -1,7 +1,10 @@
 package org.factor_investing.quant_strategy.strategies.momentum;
 
+import lombok.Getter;
+
 import java.util.List;
 
+@Getter
 public class MomentumResult {
     private final List<StockMomentum> allStocks;
     private final List<StockMomentum> qualifiedStocks;
@@ -21,14 +24,6 @@ public class MomentumResult {
         this.isValid = isValid;
         this.message = message;
     }
-
-    public List<StockMomentum> getAllStocks() { return allStocks; }
-    public List<StockMomentum> getQualifiedStocks() { return qualifiedStocks; }
-    public List<String> getTopStockNames() { return topStockNames; }
-    public int getTotalAnalyzed() { return totalAnalyzed; }
-    public int getQualifiedCount() { return qualifiedCount; }
-    public boolean isValid() { return isValid; }
-    public String getMessage() { return message; }
 }
 
 

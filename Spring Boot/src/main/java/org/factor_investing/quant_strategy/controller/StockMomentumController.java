@@ -1,11 +1,13 @@
 package org.factor_investing.quant_strategy.controller;
 
+import org.factor_investing.quant_strategy.model.AssetDataType;
 import org.factor_investing.quant_strategy.strategies.OHLCV;
 import org.factor_investing.quant_strategy.strategies.momentum.MomentumConstants;
 import org.factor_investing.quant_strategy.strategies.momentum.MomentumResult;
 import org.factor_investing.quant_strategy.strategies.momentum.StockMomentumService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -23,9 +25,9 @@ public class StockMomentumController {
     /**
      * Calculate momentum for all stocks
      */
-    @PostMapping("/calculate-initial-momentum-data")
-    public ResponseEntity<MomentumResult> calculateMomentum() {
-        MomentumResult result = momentumService.calculateMomentum();
+    @PostMapping("/calculate-initial-momentum-data/{assetDataType}")
+    public ResponseEntity<MomentumResult> calculateMomentum(@PathVariable AssetDataType assetDataType) {
+        MomentumResult result = momentumService.calculateMomentum(assetDataType);
 
         if (result.isValid()) {
             return ResponseEntity.ok(result);
@@ -37,10 +39,10 @@ public class StockMomentumController {
     /**
      * Update momentum rankings in the database
      */
-@PostMapping("/UpdateRankings")
-    public ResponseEntity<String> updateMomentumRankings() {
+@PostMapping("/UpdateRankings/{assetDataType}")
+    public ResponseEntity<String> updateMomentumRankings(@PathVariable AssetDataType assetDataType) {
         try {
-            momentumService.assignRanks();
+            momentumService.assignRanks(assetDataType);
             return ResponseEntity.ok("Momentum rankings updated successfully.");
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Failed to update momentum rankings.");

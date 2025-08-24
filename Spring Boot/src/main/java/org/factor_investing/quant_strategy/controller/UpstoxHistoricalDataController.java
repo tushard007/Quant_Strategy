@@ -4,7 +4,7 @@ import com.upstox.api.GetHistoricalCandleResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.factor_investing.quant_strategy.model.NSE_ETFMasterData;
 import org.factor_investing.quant_strategy.model.NSEStockMasterData;
-import org.factor_investing.quant_strategy.model.NseDataType;
+import org.factor_investing.quant_strategy.model.AssetDataType;
 import org.factor_investing.quant_strategy.model.PriceFrequencey;
 import org.factor_investing.quant_strategy.service.UpstoxHistoricalDataService;
 import org.factor_investing.quant_strategy.model.response.JGetHistoricalCandleResponse;
@@ -42,7 +42,7 @@ public class UpstoxHistoricalDataController {
         beforeYearDate = DateUtil.getFridayDateIfWeekend(beforeYearDate);
         String fromDate = beforeYearDate.format(formatter);
 
-        if(NseDataType.STOCK.equals(NseDataType.valueOf(nseDataType))) {
+        if(AssetDataType.STOCK.equals(AssetDataType.valueOf(nseDataType))) {
             List<NSEStockMasterData> stockDataList = upstoxHistoricalDataService.getNSEStockData();
             for (NSEStockMasterData stockData : stockDataList) {
                 String instrumentKey = STR."NSE_EQ|\{stockData.getIsinNumber()}";
@@ -72,7 +72,7 @@ public class UpstoxHistoricalDataController {
                 }
             }
         }
-        if (NseDataType.INDEX.equals(NseDataType.valueOf(nseDataType))) {
+        if (AssetDataType.INDEX.equals(AssetDataType.valueOf(nseDataType))) {
         List<NSE_ETFMasterData>  indexDataList = upstoxHistoricalDataService.getNSEIndexData();
             for (NSE_ETFMasterData indexData : indexDataList) {
                 String instrumentKey = STR."NSE_EQ|\{indexData.getIsinNumber()}";
@@ -103,13 +103,9 @@ public class UpstoxHistoricalDataController {
             }
         }
 
-
-
-
         upstoxHistoricalDataService.saveHistoricalJsonData(result, STR."\{timeFrame}_\{nseDataType}_historical_data");
         return result;
     }
-
 
 
     public JGetHistoricalCandleResponse getJavaObjectHistoricalData(GetHistoricalCandleResponse apiResult, String stockName, String symbol) throws ParseException {

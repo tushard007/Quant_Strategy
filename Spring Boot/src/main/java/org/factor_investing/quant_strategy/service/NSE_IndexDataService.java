@@ -1,7 +1,7 @@
 package org.factor_investing.quant_strategy.service;
 
 import org.factor_investing.quant_strategy.model.NSE_ETFMasterData;
-import org.factor_investing.quant_strategy.repository.NSE_IndexDataRepository;
+import org.factor_investing.quant_strategy.repository.NSE_ETFMasterDataRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -11,7 +11,7 @@ import java.util.List;
 @Service
 public class NSE_IndexDataService {
     @Autowired
-    private NSE_IndexDataRepository indexRepository;
+    private NSE_ETFMasterDataRepository indexRepository;
 
     public void saveIndexData(NSE_ETFMasterData indexData) {
         indexRepository.save(indexData);

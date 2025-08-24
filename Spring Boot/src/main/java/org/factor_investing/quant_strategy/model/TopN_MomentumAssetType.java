@@ -14,7 +14,7 @@ import java.sql.Date;
 })
 @Getter
 @Setter
-public class TopN_MomentumStock{
+public class TopN_MomentumAssetType {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     public Integer id;
@@ -27,6 +27,8 @@ public class TopN_MomentumStock{
     public int Rank6Months;
     public int Rank3Months;
     public int TotalRankScore;
+    @Enumerated(EnumType.STRING)
+    public AssetDataType assetDataType;
     @CreationTimestamp
     private java.util.Date creationDate;
     @UpdateTimestamp

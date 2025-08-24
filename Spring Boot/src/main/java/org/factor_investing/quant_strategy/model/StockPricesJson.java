@@ -27,10 +27,13 @@ public class StockPricesJson {
     private List<OHLCV> ohlcvData;
 
     @Enumerated(EnumType.STRING)
-    private NseDataType nsseDataType;
+    private AssetDataType nsseDataType;
 
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "stockSymbol", referencedColumnName = "symbol",nullable = false)
     private NSEStockMasterData nseStockMasterData;
 
+    @OneToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "IndexSymbol", referencedColumnName = "symbol")
+    private NSE_ETFMasterData nse_etfMasterData;
 }
