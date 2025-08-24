@@ -1,7 +1,7 @@
 package org.factor_investing.quant_strategy.service;
 
-import org.factor_investing.quant_strategy.model.NSE_StockMasterData;
-import org.factor_investing.quant_strategy.repository.NSE_StockDataRepository;
+import org.factor_investing.quant_strategy.model.NSEStockMasterData;
+import org.factor_investing.quant_strategy.repository.NSEStockMasterDataRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -10,28 +10,28 @@ import java.util.List;
 @Service
 public class NSE_StockDataService {
     @Autowired
-    private NSE_StockDataRepository stockRepository;
+    private NSEStockMasterDataRepository stockRepository;
 
-    public void saveStockData(NSE_StockMasterData stockData) {
+    public void saveStockData(NSEStockMasterData stockData) {
         stockRepository.save(stockData);
     }
-    public NSE_StockMasterData getStockDataById(Long id) {
+    public NSEStockMasterData getStockDataById(Long id) {
         return stockRepository.findById(id).orElse(null);
     }
     public void deleteStockData(Long id) {
         stockRepository.deleteById(id);
     }
-    public List<NSE_StockMasterData> getAllStockData() {
-        return stockRepository.findAllBySeriesIs("EQ");
+    public List<NSEStockMasterData> getAllStockData() {
+        return stockRepository.findAll();
     }
-    public void updateStockData(NSE_StockMasterData stockData) {
+    public void updateStockData(NSEStockMasterData stockData) {
         if (stockRepository.existsById(stockData.getId())) {
             stockRepository.save(stockData);
         } else {
             throw new IllegalArgumentException(STR."Stock data with ID \{stockData.getId()} does not exist.");
         }
     }
-    public NSE_StockMasterData getStockDataBySymbol(String symbol) {
+    public NSEStockMasterData getStockDataBySymbol(String symbol) {
         return stockRepository.findAll().stream()
                 .filter(stock -> stock.getSymbol().equalsIgnoreCase(symbol))
                 .findFirst()
@@ -39,14 +39,14 @@ public class NSE_StockDataService {
     }
 
     public void deleteStockDataBySymbol(String symbol) {
-        NSE_StockMasterData stockData = getStockDataBySymbol(symbol);
+        NSEStockMasterData stockData = getStockDataBySymbol(symbol);
         if (stockData != null) {
             stockRepository.delete(stockData);
         } else {
             throw new IllegalArgumentException(STR."Stock data with symbol \{symbol} does not exist.");
         }
     }
-    public void saveAllStockData(Iterable<NSE_StockMasterData> stockDataList) {
+    public void saveAllStockData(Iterable<NSEStockMasterData> stockDataList) {
         stockRepository.saveAll(stockDataList);
     }
 

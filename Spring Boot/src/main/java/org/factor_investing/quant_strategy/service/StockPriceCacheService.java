@@ -1,85 +1,102 @@
 package org.factor_investing.quant_strategy.service;
 
 import lombok.extern.slf4j.Slf4j;
-import org.factor_investing.quant_strategy.model.StockPriceData;
+import org.factor_investing.quant_strategy.model.StockPriceDataMapper;
+import org.factor_investing.quant_strategy.model.StockPricesJson;
 import org.factor_investing.quant_strategy.repository.StockPriceDataRepository;
+import org.factor_investing.quant_strategy.strategies.OHLCV;
+import org.factor_investing.quant_strategy.util.DateUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationStartedEvent;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.sql.Date;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
 public class StockPriceCacheService {
 
-    // In-memory cache using ConcurrentHashMap for thread-safety
-    private final Map<String, Float> stockPriceCache = new ConcurrentHashMap<>();
 
+    @Autowired
+    private StockDataService stockDataService;
     @Autowired
     private StockPriceDataRepository stockPriceRepository;
 
-    // Preload all stock prices into cache on application startup
+    //    @PostConstruct
     @EventListener(ApplicationStartedEvent.class)
-    public void preloadStockPrices() {
-        log.info("Preloading stock prices into cache...");
+    @Cacheable(value = "stockPrices", key = "#symbol")
+    public Map<String, List<OHLCV>> getAllStockPriceData() {
+        List<StockPricesJson> stockPricesJsonList = stockDataService.getAllStockData();
+        Map<String, List<OHLCV>> stockPriceDataMap = stockPricesJsonList.stream().limit(10)
+                .collect(Collectors.toMap(
+                        stockPrice -> stockPrice.getNseStockMasterData().getSymbol(),
+                        StockPricesJson::getOhlcvData
+                ));
+        log.info("Retrieved all stock price data with {} entries.", stockPriceDataMap.size());
+        return stockPriceDataMap;
 
-        List<StockPriceData> allStockPrices = stockPriceRepository.findAll();
+    }
 
-        allStockPrices.forEach(stockPrice -> {
-            String cacheKey = generateCacheKey(
-                    stockPrice.getSymbol(),
-                  stockPrice.getDate()
-            );
-            stockPriceCache.put(cacheKey, (float) stockPrice.getOpen());
+    public void getAllStockPriceDataMapper() {
+        Map<String, List<OHLCV>> allStockPriceData = getAllStockPriceData();
+        // Convert to StockPriceDataMapper for further processing if neededst
+        AtomicReference<StockPriceDataMapper> stockPriceDataMapper = null;
+        allStockPriceData.forEach((key, value) -> {
+            String symbol = key;
+            value.forEach(ohlcv -> {
+                double close = ohlcv.getOpen();
+                Date date = (Date) ohlcv.getDate();
+                stockPriceDataMapper.set(new StockPriceDataMapper(symbol, date, close));
+            });
         });
 
-        log.info("Preloaded {} stock prices into cache", stockPriceCache.size());
     }
 
-    // Generate a unique cache key
-    private String generateCacheKey(String stockTicker, Date priceDate) {
-        return stockTicker + "_" + priceDate.getTime();
-    }
+    /**
+     * Retrieves the closing price of a stock by its symbol and date.
+     *
+     * @param symbol The stock symbol.
+     * @param date   The date for which to retrieve the closing price.
+     * @return The closing price of the stock on the specified date, or null if not found.
+     */
+    public Double getStockClosingPriceBySymbolAndDate(String symbol, LocalDate date) {
+        Map<String, List<OHLCV>> allStockPriceData = getAllStockPriceData();
+        List<OHLCV> ohlcvList = allStockPriceData.get(symbol);
+        Double stockClosingPrice = 0.0;
 
-    // Retrieve stock price from cache
-    public Float getStockPrice(String stockTicker, Date priceDate) {
-        String cacheKey = generateCacheKey(stockTicker, priceDate);
-        Float price = stockPriceCache.get(cacheKey);
-
-        if (price == null) {
-            log.error("Stock price not found for {} on {}", stockTicker, priceDate);
-            return 0.0f;
+        if (ohlcvList != null) {
+            for (OHLCV ohlcv : ohlcvList) {
+                LocalDate ohlcvDate = DateUtil.convertDateToLocalDate(ohlcv.getDate());
+                if (ohlcvDate.isEqual(date)) {
+                    stockClosingPrice = ohlcv.getClose();
+                    break;
+                }
+            }
         }
-        return price;
+        return stockClosingPrice;
     }
 
-    // Bulk insert and update cache
-    public void saveAllStockPrices(List<StockPriceData> stockPrices) {
-        List<StockPriceData> savedPrices = stockPriceRepository.saveAll(stockPrices);
+    /**
+     * Retrieves all stock price dates for a given stock symbol.
+     *
+     * @param symbol The stock symbol.
+     * @return A set of dates for which stock prices are available for the specified symbol.
+     */
+    public Set<java.util.Date> getAllStockPriceDateBySymbol(String symbol) {
+        Map<String, List<OHLCV>> allStockPriceData = getAllStockPriceData();
+        List<OHLCV> ohlcvList = allStockPriceData.get(symbol);
+        return ohlcvList.stream()
+                .map(OHLCV::getDate)
+                .collect(Collectors.toSet());
 
-        savedPrices.forEach(stockPrice -> {
-            String cacheKey = generateCacheKey(
-                    stockPrice.getSymbol(),
-                    stockPrice.getDate()
-            );
-            stockPriceCache.put(cacheKey, (float) stockPrice.getClose());
-        });
-    }
-
-    // Method to refresh entire cache
-    public void refreshCache() {
-        stockPriceCache.clear();
-        preloadStockPrices();
-    }
-
-    // Get cache size for monitoring
-    public int getCacheSize() {
-        return stockPriceCache.size();
     }
 }
 

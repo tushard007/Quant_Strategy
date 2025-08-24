@@ -1,10 +1,9 @@
 package org.factor_investing.quant_strategy.controller;
 
 import com.upstox.api.GetHistoricalCandleResponse;
-import jakarta.websocket.server.PathParam;
 import lombok.extern.slf4j.Slf4j;
 import org.factor_investing.quant_strategy.model.NSE_ETFMasterData;
-import org.factor_investing.quant_strategy.model.NSE_StockMasterData;
+import org.factor_investing.quant_strategy.model.NSEStockMasterData;
 import org.factor_investing.quant_strategy.model.NseDataType;
 import org.factor_investing.quant_strategy.model.PriceFrequencey;
 import org.factor_investing.quant_strategy.service.UpstoxHistoricalDataService;
@@ -39,13 +38,13 @@ public class UpstoxHistoricalDataController {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         String toDate = currentDate.format(formatter);
 
-        LocalDate beforeYearDate =  DateUtil.getDateBeforeYear(currentDate, 1);
+        LocalDate beforeYearDate =  DateUtil.getDateBeforeYear(currentDate, 2);
         beforeYearDate = DateUtil.getFridayDateIfWeekend(beforeYearDate);
         String fromDate = beforeYearDate.format(formatter);
 
         if(NseDataType.STOCK.equals(NseDataType.valueOf(nseDataType))) {
-            List<NSE_StockMasterData> stockDataList = upstoxHistoricalDataService.getNSEStockData();
-            for (NSE_StockMasterData stockData : stockDataList) {
+            List<NSEStockMasterData> stockDataList = upstoxHistoricalDataService.getNSEStockData();
+            for (NSEStockMasterData stockData : stockDataList) {
                 String instrumentKey = STR."NSE_EQ|\{stockData.getIsinNumber()}";
                 String stockName = stockData.getNameOfCompany();
                 log.info("Fetching historical candle data for stock: {}", stockName);

@@ -6,7 +6,7 @@ import com.upstox.api.GetHistoricalCandleResponse;
 import io.swagger.client.api.HistoryV3Api;
 import lombok.extern.slf4j.Slf4j;
 import org.factor_investing.quant_strategy.model.NSE_ETFMasterData;
-import org.factor_investing.quant_strategy.model.NSE_StockMasterData;
+import org.factor_investing.quant_strategy.model.NSEStockMasterData;
 import org.factor_investing.quant_strategy.model.response.JGetHistoricalCandleResponse;
 import org.factor_investing.quant_strategy.util.JsonUtility;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,7 +43,7 @@ public class UpstoxHistoricalDataService {
         return result;
     }
 
-    public List<NSE_StockMasterData> getNSEStockData() {
+    public List<NSEStockMasterData> getNSEStockData() {
         return nseStockDataService.getAllStockData();
 
     }

@@ -1,14 +1,27 @@
 package org.factor_investing.quant_strategy.controller;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.factor_investing.quant_strategy.model.StockPriceData;
+import org.factor_investing.quant_strategy.model.NSEStockMasterData;
+import org.factor_investing.quant_strategy.model.NseDataType;
+import org.factor_investing.quant_strategy.model.StockPriceDataMapper;
+import org.factor_investing.quant_strategy.model.StockPricesJson;
 import org.factor_investing.quant_strategy.model.response.JGetHistoricalCandleResponse;
-import org.factor_investing.quant_strategy.repository.StockPriceDataRepository;
+import org.factor_investing.quant_strategy.repository.NSEStockMasterDataRepository;
+import org.factor_investing.quant_strategy.repository.StockDataRepository;
+import org.factor_investing.quant_strategy.service.StockDataService;
 import org.factor_investing.quant_strategy.service.UpstoxHistoricalDataService;
+import org.factor_investing.quant_strategy.strategies.OHLCV;
 import org.factor_investing.quant_strategy.util.DateUtil;
 import org.factor_investing.quant_strategy.util.JsonUtility;
+import org.springframework.boot.context.event.ApplicationStartedEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.text.ParseException;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -18,13 +31,18 @@ import java.util.stream.Collectors;
 @Slf4j
 public class HistoricalDataJsonOperationController {
     private final UpstoxHistoricalDataService upstoxHistoricalDataService;
-    private final StockPriceDataRepository stockPriceDataRepository;
+    private final StockDataRepository stockPriceDataRepository;
+    private final NSEStockMasterDataRepository nseStockMasterDataRepository;
+    private final StockDataService stockDataService;
 
-    public HistoricalDataJsonOperationController(UpstoxHistoricalDataService upstoxHistoricalDataService, StockPriceDataRepository stockPriceDataRepository) {
+
+    public HistoricalDataJsonOperationController(UpstoxHistoricalDataService upstoxHistoricalDataService, StockDataRepository stockPriceDataRepository, NSEStockMasterDataRepository nseStockMasterDataRepository, StockDataService stockDataService) {
         this.upstoxHistoricalDataService = upstoxHistoricalDataService;
         this.stockPriceDataRepository = stockPriceDataRepository;
-
+        this.nseStockMasterDataRepository = nseStockMasterDataRepository;
+        this.stockDataService = stockDataService;
     }
+
 
     @GetMapping("/load-historical-json-data/{fileName}")
     public Map<String, List<JGetHistoricalCandleResponse.CandleData>> loadHistoricalJsonData(@PathVariable String fileName) {
@@ -71,40 +89,55 @@ public class HistoricalDataJsonOperationController {
             return "File Content deletion failed";
         }
     }
-@PostMapping("/save-historical-json-data/{fileName}")
-    public String saveJsonDataToDB(@PathVariable String fileName) {
-    long startTime = System.nanoTime();
-    List<JGetHistoricalCandleResponse> historicalData = upstoxHistoricalDataService.loadHistoricalJsonData(STR."json/\{fileName}.json");
-    long endTime = System.nanoTime();
-    long durationInNano = endTime - startTime;
-    double durationInSeconds = (double) durationInNano / 1_000_000_000.0; // Convert to seconds
-    log.info("Time taken to load historical data from JSON file: {} seconds", durationInSeconds);
-    Map<String, List<JGetHistoricalCandleResponse.CandleData>> stockData = new LinkedHashMap<>();
-        stockData = historicalData.stream().collect(Collectors.toMap(JGetHistoricalCandleResponse::getSymbol, JGetHistoricalCandleResponse::getData));
-    long endTime2 = System.nanoTime();
-    long durationInNano2 = endTime2 - startTime;
-    double durationInSeconds2 = (double) durationInNano2 / 1_000_000_000.0; // Convert to seconds
-    log.info("Time taken to load historical data to DB 10 records: {} seconds", durationInSeconds2);
 
-    List<StockPriceData> stockPriceDataList= new ArrayList<>();
+    @PostMapping("/save-historical-json-data/{fileName}")
+    public String saveJsonDataToDB(@PathVariable String fileName) {
+        long startTime = System.nanoTime();
+        List<JGetHistoricalCandleResponse> historicalData = upstoxHistoricalDataService.loadHistoricalJsonData(STR."json/\{fileName}.json");
+        long endTime = System.nanoTime();
+        long durationInNano = endTime - startTime;
+        double durationInSeconds = (double) durationInNano / 1_000_000_000.0; // Convert to seconds
+        log.info("Time taken to load historical data from JSON file: {} seconds", durationInSeconds);
+        Map<String, List<JGetHistoricalCandleResponse.CandleData>> stockData = new LinkedHashMap<>();
+        stockData = historicalData.stream().collect(Collectors.toMap(JGetHistoricalCandleResponse::getSymbol, JGetHistoricalCandleResponse::getData));
+        long endTime2 = System.nanoTime();
+        long durationInNano2 = endTime2 - startTime;
+        double durationInSeconds2 = (double) durationInNano2 / 1_000_000_000.0; // Convert to seconds
+        log.info("Time taken to load historical data to DB 10 records: {} seconds", durationInSeconds2);
+
+        List<StockPricesJson> stockPriceDataList = new ArrayList<>();
+        List<NSEStockMasterData> nseStockMasterData = nseStockMasterDataRepository.findAll();
+
 
         stockData.forEach(
                 (symbol, candleDataList) -> {
+                    List<OHLCV> ohlcvDataList = new ArrayList<>();
+                    StockPricesJson stockPricesJson = new StockPricesJson();
+                    NSEStockMasterData stockMasterData = nseStockMasterData.stream().filter(data -> data.getSymbol().equalsIgnoreCase(symbol)).findFirst().orElse(null);
+                    stockPricesJson.setNseStockMasterData(stockMasterData);
                     for (JGetHistoricalCandleResponse.CandleData candleData : candleDataList) {
-                        StockPriceData stockPriceData = new StockPriceData();
-                        stockPriceData.setSymbol(symbol);
-                        stockPriceData.setDate(new java.sql.Date(candleData.getPriceDate().getTime()));
-                        stockPriceData.setOpen(candleData.getOpen());
-                        stockPriceData.setHigh(candleData.getHigh());
-                        stockPriceData.setLow(candleData.getLow());
-                        stockPriceData.setClose(candleData.getClose());
-                        stockPriceData.setVolume(candleData.getVolume());
-                        stockPriceDataList.add(stockPriceData);
+                        OHLCV ohlcv = new OHLCV();
+                        ohlcv.setDate(candleData.getPriceDate());
+                        ohlcv.setOpen(candleData.getOpen());
+                        ohlcv.setHigh(candleData.getHigh());
+                        ohlcv.setLow(candleData.getLow());
+                        ohlcv.setClose(candleData.getClose());
+                        ohlcv.setVolume(candleData.getVolume());
+                        ohlcvDataList.add(ohlcv);
                     }
+                    stockPricesJson.setNsseDataType(NseDataType.STOCK);
+                    stockPricesJson.setOhlcvData(ohlcvDataList);
+                    stockPriceDataList.add(stockPricesJson);
                 }
+
         );
+
         stockPriceDataRepository.saveAll(stockPriceDataList);
+
+
         log.info("Created stock price data list with {} entries.", stockPriceDataList.size());
         return STR."Successfully saved stock price data to DB with size: \{stockPriceDataList.size()}";
     }
+
+
 }
