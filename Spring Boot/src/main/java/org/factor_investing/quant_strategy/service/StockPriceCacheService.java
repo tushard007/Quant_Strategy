@@ -3,7 +3,6 @@ package org.factor_investing.quant_strategy.service;
 import lombok.extern.slf4j.Slf4j;
 import org.factor_investing.quant_strategy.model.StockPriceDataMapper;
 import org.factor_investing.quant_strategy.model.StockPricesJson;
-import org.factor_investing.quant_strategy.repository.StockPriceDataRepository;
 import org.factor_investing.quant_strategy.strategies.OHLCV;
 import org.factor_investing.quant_strategy.util.DateUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,10 +26,7 @@ public class StockPriceCacheService {
 
     @Autowired
     private StockDataService stockDataService;
-    @Autowired
-    private StockPriceDataRepository stockPriceRepository;
 
-    //    @PostConstruct
     @EventListener(ApplicationStartedEvent.class)
     @Cacheable(value = "stockPrices", key = "#symbol")
     public Map<String, List<OHLCV>> getAllStockPriceData() {
