@@ -38,7 +38,6 @@ public class UpstoxHistoricalDataService {
 
         } catch (ApiException e) {
             System.err.println("Exception when calling HistoryV3Api->getHistoricalCandleData1");
-            e.printStackTrace();
         }
         return result;
     }

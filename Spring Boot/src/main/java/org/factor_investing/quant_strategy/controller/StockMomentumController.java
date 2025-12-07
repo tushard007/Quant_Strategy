@@ -1,8 +1,6 @@
 package org.factor_investing.quant_strategy.controller;
 
 import org.factor_investing.quant_strategy.model.AssetDataType;
-import org.factor_investing.quant_strategy.strategies.OHLCV;
-import org.factor_investing.quant_strategy.strategies.momentum.MomentumConstants;
 import org.factor_investing.quant_strategy.strategies.momentum.MomentumResult;
 import org.factor_investing.quant_strategy.strategies.momentum.StockMomentumService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,9 +9,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/momentum")

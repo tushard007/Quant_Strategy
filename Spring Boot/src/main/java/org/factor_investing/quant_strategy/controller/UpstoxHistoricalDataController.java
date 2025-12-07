@@ -31,7 +31,7 @@ public class UpstoxHistoricalDataController {
     }
 
     @GetMapping("/get-candle-data/{timeFrame}/{nseDataType}")
-    private List<JGetHistoricalCandleResponse> getHistoricalWeeklyCandleData(@PathVariable String timeFrame,@PathVariable String nseDataType) throws ParseException {
+    private List<JGetHistoricalCandleResponse> getHistoricalWeeklyCandleData(@PathVariable PriceFrequencey timeFrame,@PathVariable AssetDataType nseDataType) throws ParseException {
         List<JGetHistoricalCandleResponse> result = new ArrayList<>();
         LocalDate currentDate = LocalDate.now();
         currentDate= DateUtil.getFridayDateIfWeekend(currentDate);
@@ -42,7 +42,7 @@ public class UpstoxHistoricalDataController {
         beforeYearDate = DateUtil.getFridayDateIfWeekend(beforeYearDate);
         String fromDate = beforeYearDate.format(formatter);
 
-        if(AssetDataType.STOCK.equals(AssetDataType.valueOf(nseDataType))) {
+        if(AssetDataType.STOCK.equals(AssetDataType.valueOf(nseDataType.name()))) {
             List<NSEStockMasterData> stockDataList = upstoxHistoricalDataService.getNSEStockData();
             for (NSEStockMasterData stockData : stockDataList) {
                 String instrumentKey = STR."NSE_EQ|\{stockData.getIsinNumber()}";
@@ -57,10 +57,10 @@ public class UpstoxHistoricalDataController {
                     }
                 }
                 GetHistoricalCandleResponse response =null;
-                if(PriceFrequencey.WEEKLY.equals(PriceFrequencey.valueOf(timeFrame))) {
+                if(PriceFrequencey.WEEKLY.equals(PriceFrequencey.valueOf(timeFrame.name()))) {
                     response= upstoxHistoricalDataService.getHistoricalCandleData(instrumentKey, "weeks", 1, toDate, fromDate);
                 }
-                if(PriceFrequencey.DAILY.equals(PriceFrequencey.valueOf(timeFrame))) {
+                if(PriceFrequencey.DAILY.equals(PriceFrequencey.valueOf(timeFrame.name()))) {
                     response= upstoxHistoricalDataService.getHistoricalCandleData(instrumentKey, "days", 1, toDate, fromDate);
                 }
 
@@ -72,7 +72,7 @@ public class UpstoxHistoricalDataController {
                 }
             }
         }
-        if (AssetDataType.INDEX.equals(AssetDataType.valueOf(nseDataType))) {
+        if (AssetDataType.INDEX.equals(AssetDataType.valueOf(nseDataType.name()))) {
         List<NSE_ETFMasterData>  indexDataList = upstoxHistoricalDataService.getNSEIndexData();
             for (NSE_ETFMasterData indexData : indexDataList) {
                 String instrumentKey = STR."NSE_EQ|\{indexData.getIsinNumber()}";
@@ -87,10 +87,10 @@ public class UpstoxHistoricalDataController {
                     }
                 }
                 GetHistoricalCandleResponse response =null;
-                if(PriceFrequencey.WEEKLY.equals(PriceFrequencey.valueOf(timeFrame))) {
+                if(PriceFrequencey.WEEKLY.equals(PriceFrequencey.valueOf(timeFrame.name()))) {
                     response= upstoxHistoricalDataService.getHistoricalCandleData(instrumentKey, "weeks", 1, toDate, fromDate);
                 }
-                if(PriceFrequencey.DAILY.equals(PriceFrequencey.valueOf(timeFrame))) {
+                if(PriceFrequencey.DAILY.equals(PriceFrequencey.valueOf(timeFrame.name()))) {
                     response= upstoxHistoricalDataService.getHistoricalCandleData(instrumentKey, "days", 1, toDate, fromDate);
                 }
 
