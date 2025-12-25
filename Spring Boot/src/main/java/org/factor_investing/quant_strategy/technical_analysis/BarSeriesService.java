@@ -10,6 +10,7 @@ import org.ta4j.core.num.DecimalNum;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -21,14 +22,14 @@ public class BarSeriesService {
      */
 
     public BarSeries buildSeriesFromStockPrice(List<OHLCV> rows) {
-        BarSeries series = new BaseBarSeriesBuilder().withName("ohlcv-series").build();
+        BarSeries series = new BaseBarSeriesBuilder().withName("OHLCV-series").build();
 
         Duration barDuration = Duration.ofDays(1);
 
         // Work on a copy and ensure rows are ordered by date ascending
-        List<OHLCV> sorted = new java.util.ArrayList<>(rows);
-        sorted.sort((a, b) -> a.getDate().compareTo(b.getDate()));
-        for (OHLCV r : sorted) {
+        List<OHLCV> sortedDate = new java.util.ArrayList<>(rows);
+        sortedDate.sort(Comparator.comparing(OHLCV::getDate));
+        for (OHLCV r : sortedDate) {
             if (r == null || r.getDate() == null) {
                 continue;
             }

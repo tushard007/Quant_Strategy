@@ -10,6 +10,7 @@ import org.springframework.boot.context.event.ApplicationStartedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.PostConstruct;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -24,14 +25,17 @@ import java.util.stream.Collectors;
 public class StockPriceCacheService {
 
 
-    @Autowired
-    private StockDataService stockDataService;
+    private final StockDataService stockDataService;
 
+    public StockPriceCacheService(StockDataService stockDataService) {
+        this.stockDataService = stockDataService;
+    }
 
+    @PostConstruct
     public Map<String, List<OHLCV>> getAllStockPriceData() {
         List<StockPricesJson> stockPricesJsonList = stockDataService.getAllStockData();
         Map<String, List<OHLCV>> stockPriceDataMap = stockPricesJsonList.stream().
-                filter(stockPricesJson -> stockPricesJson.getNsseDataType() == AssetDataType.STOCK &&
+                filter(stockPricesJson -> stockPricesJson.getNseDataType() == AssetDataType.STOCK &&
                         stockPricesJson.getNseStockMasterData().getSymbol() != null)
                 .collect(Collectors.toMap(
                         stockPrice -> stockPrice.getNseStockMasterData().getSymbol(),
@@ -45,7 +49,7 @@ public class StockPriceCacheService {
     public Map<String, List<OHLCV>> getAllIndexPriceData() {
         List<StockPricesJson> stockPricesJsonList = stockDataService.getAllStockData();
         Map<String, List<OHLCV>> stockPriceDataMap = stockPricesJsonList.stream().
-                filter(stockPricesJson -> stockPricesJson.getNsseDataType() == AssetDataType.INDEX &&
+                filter(stockPricesJson -> stockPricesJson.getNseDataType() == AssetDataType.INDEX &&
                         stockPricesJson.getNse_etfMasterData().getSymbol() != null)
                 .collect(Collectors.toMap(
                         stockPrice -> stockPrice.getNse_etfMasterData().getSymbol(),

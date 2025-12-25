@@ -7,27 +7,33 @@ import io.swagger.client.api.HistoryV3Api;
 import lombok.extern.slf4j.Slf4j;
 import org.factor_investing.quant_strategy.model.NSE_ETFMasterData;
 import org.factor_investing.quant_strategy.model.NSEStockMasterData;
+import org.factor_investing.quant_strategy.model.StockPricesJson;
 import org.factor_investing.quant_strategy.model.response.JGetHistoricalCandleResponse;
+import org.factor_investing.quant_strategy.repository.StockDataRepository;
+import org.factor_investing.quant_strategy.strategies.OHLCV;
 import org.factor_investing.quant_strategy.util.JsonUtility;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
 public class UpstoxHistoricalDataService {
 
-    private NSE_StockDataService nseStockDataService;
-    private NSE_IndexDataService nseIndexDataService;
+    private final NSE_StockDataService nseStockDataService;
+    private final NSE_IndexDataService nseIndexDataService;
+    private final StockDataRepository stockPriceDataRepository;
     private final JsonUtility jsonUtility;
 
     @Autowired
     public UpstoxHistoricalDataService(JsonUtility jsonUtility, NSE_IndexDataService nseIndexDataService,
-                                       NSE_StockDataService nseStockDataService) {
+                                       NSE_StockDataService nseStockDataService, StockDataRepository stockPriceDataRepository) {
         this.nseIndexDataService = nseIndexDataService;
         this.nseStockDataService = nseStockDataService;
         this.jsonUtility = jsonUtility;
+        this.stockPriceDataRepository = stockPriceDataRepository;
     }
 
     public GetHistoricalCandleResponse getHistoricalCandleData(String instrumentKey, String timeFrame, int interval, String toDate, String fromDate) {

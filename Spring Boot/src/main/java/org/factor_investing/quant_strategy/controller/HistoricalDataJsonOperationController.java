@@ -54,21 +54,6 @@ public class HistoricalDataJsonOperationController {
         return stockData;
     }
 
-    @GetMapping("/get-close-price/{fileName}/{symbol}/{date}")
-    public Double getClosePricebySymbolandDate(@PathVariable String fileName, @PathVariable String symbol, @PathVariable String date) throws ParseException {
-        String filePath = "json/" + fileName;
-        List<JGetHistoricalCandleResponse> historicalData = upstoxHistoricalDataService.loadHistoricalJsonData(filePath);
-        Map<String, List<JGetHistoricalCandleResponse.CandleData>> stockData = new LinkedHashMap<>();
-        stockData = historicalData.stream().collect(Collectors.toMap(JGetHistoricalCandleResponse::getSymbol, JGetHistoricalCandleResponse::getData));
-        Date forDate = DateUtil.stringToDate(date);
-        //return close price of stock based on stock symbol and date
-        return stockData.get(symbol).stream()
-                .filter(candleData -> candleData.getPriceDate().compareTo(forDate) == 1)
-                .map(JGetHistoricalCandleResponse.CandleData::getClose)
-                .findFirst()
-                .orElse(null);
-    }
-
     @DeleteMapping("/clear-historical-json-data")
     public String clearHistoricalJsonData() {
         JsonUtility jsonUtility = new JsonUtility();
@@ -85,61 +70,81 @@ public class HistoricalDataJsonOperationController {
     @PostMapping("/save-historical-json-data/{fileName}")
     public String saveJsonDataToDB(@PathVariable String fileName) {
         String[] fileParts = fileName.split("_");
-        var ref = new Object() {
-            boolean isStockData = false;
-        };
-        for (String part : fileParts) {
-            if (part.equalsIgnoreCase("STOCK")) {
-                ref.isStockData = true;
-                break;
-            }
-            }
-            long startTime = System.nanoTime();
-            List<JGetHistoricalCandleResponse> historicalData = upstoxHistoricalDataService.loadHistoricalJsonData(STR."json/\{fileName}.json");
-            long endTime = System.nanoTime();
-            long durationInNano = endTime - startTime;
-            double durationInSeconds = (double) durationInNano / 1_000_000_000.0; // Convert to seconds
-            log.info("Time taken to load historical data from JSON file: {} seconds", durationInSeconds);
-            Map<String, List<JGetHistoricalCandleResponse.CandleData>> stockData = new LinkedHashMap<>();
-            stockData = historicalData.stream().collect(Collectors.toMap(JGetHistoricalCandleResponse::getSymbol, JGetHistoricalCandleResponse::getData));
-            long endTime2 = System.nanoTime();
-            long durationInNano2 = endTime2 - startTime;
-            double durationInSeconds2 = (double) durationInNano2 / 1_000_000_000.0; // Convert to seconds
-            log.info("Time taken to load historical data to DB records: {} seconds", durationInSeconds2);
+        boolean isStockData = Arrays.stream(fileParts).anyMatch(p -> p.equalsIgnoreCase("STOCK"));
 
-            List<StockPricesJson> stockPriceDataList = new ArrayList<>();
-            List<NSEStockMasterData> nseStockMasterData = nseStockMasterDataRepository.findAll();
-            List<NSE_ETFMasterData> nseIndexDataMasterData = nse_indexDataRepository.findAll();
-            stockData.forEach(
-                    (symbol, candleDataList) -> {
-                        List<OHLCV> ohlcvDataList = new ArrayList<>();
-                        StockPricesJson stockPricesJson = new StockPricesJson();
-                        if (ref.isStockData) {
-                            NSEStockMasterData stockMasterData = nseStockMasterData.stream().filter(data -> data.getSymbol().equalsIgnoreCase(symbol)).findFirst().orElse(null);
-                            stockPricesJson.setNseStockMasterData(stockMasterData);
-                            stockPricesJson.setNsseDataType(AssetDataType.STOCK);
-                        }
-                        else {
-                            NSE_ETFMasterData etfMasterData = nseIndexDataMasterData.stream().filter(data -> data.getSymbol().equalsIgnoreCase(symbol)).findFirst().orElse(null);
-                            stockPricesJson.setNse_etfMasterData(etfMasterData);
-                            stockPricesJson.setNsseDataType(AssetDataType.INDEX);
-                        }
-                        for (JGetHistoricalCandleResponse.CandleData candleData : candleDataList) {
-                            OHLCV ohlcv = new OHLCV();
-                            ohlcv.setDate(candleData.getPriceDate());
-                            ohlcv.setOpen(candleData.getOpen());
-                            ohlcv.setHigh(candleData.getHigh());
-                            ohlcv.setLow(candleData.getLow());
-                            ohlcv.setClose(candleData.getClose());
-                            ohlcv.setVolume(candleData.getVolume());
-                            ohlcvDataList.add(ohlcv);
-                        }
-                        stockPricesJson.setOhlcvData(ohlcvDataList);
-                        stockPriceDataList.add(stockPricesJson);
-                    }
-            );
-            stockPriceDataRepository.saveAll(stockPriceDataList);
-            log.info("Created stock price data list with {} entries.", stockPriceDataList.size());
-            return STR."Successfully saved stock price data to DB with size: \{stockPriceDataList.size()}";
+        String filePath = STR."json/\{fileName}.json";
+        List<JGetHistoricalCandleResponse> historicalData = upstoxHistoricalDataService.loadHistoricalJsonData(filePath);
+        if (historicalData == null || historicalData.isEmpty()) {
+            log.warn("No historical data found for file: {}", filePath);
+            return "No historical data found";
         }
+
+        Map<String, List<JGetHistoricalCandleResponse.CandleData>> stockData = historicalData.stream()
+                .collect(Collectors.toMap(JGetHistoricalCandleResponse::getSymbol, JGetHistoricalCandleResponse::getData));
+
+        List<StockPricesJson> existingList = stockPriceDataRepository.findAll();
+        List<NSEStockMasterData> nseStockMasterData = nseStockMasterDataRepository.findAll();
+        List<NSE_ETFMasterData> nseIndexDataMasterData = nse_indexDataRepository.findAll();
+
+        List<StockPricesJson> toSave = new ArrayList<>();
+
+        for (Map.Entry<String, List<JGetHistoricalCandleResponse.CandleData>> entry : stockData.entrySet()) {
+            String symbol = entry.getKey();
+            List<JGetHistoricalCandleResponse.CandleData> candleDataList = entry.getValue();
+
+            // find existing entry safely (use findFirst\(\) on the stream)
+            StockPricesJson stockPricesJson = existingList.stream()
+                    .filter(spj -> {
+                        if (spj == null) return false;
+                        if (spj.getNseStockMasterData() != null && spj.getNseStockMasterData().getSymbol() != null) {
+                            if (spj.getNseStockMasterData().getSymbol().equalsIgnoreCase(symbol)) return true;
+                        }
+                        if (spj.getNse_etfMasterData() != null && spj.getNse_etfMasterData().getSymbol() != null) {
+                            if (spj.getNse_etfMasterData().getSymbol().equalsIgnoreCase(symbol)) return true;
+                        }
+                        return false;
+                    })
+                    .findFirst()
+                    .orElse(null);
+
+            if (stockPricesJson == null) {
+                stockPricesJson = new StockPricesJson();
+            }
+
+            if (isStockData) {
+                NSEStockMasterData stockMasterData = nseStockMasterData.stream()
+                        .filter(d -> d.getSymbol() != null && d.getSymbol().equalsIgnoreCase(symbol))
+                        .findFirst()
+                        .orElse(null);
+                stockPricesJson.setNseStockMasterData(stockMasterData);
+                stockPricesJson.setNseDataType(AssetDataType.STOCK);
+            } else {
+                NSE_ETFMasterData etfMasterData = nseIndexDataMasterData.stream()
+                        .filter(d -> d.getSymbol() != null && d.getSymbol().equalsIgnoreCase(symbol))
+                        .findFirst()
+                        .orElse(null);
+                stockPricesJson.setNse_etfMasterData(etfMasterData);
+                stockPricesJson.setNseDataType(AssetDataType.INDEX);
+            }
+
+            List<OHLCV> ohlcvDataList = candleDataList.stream().map(c -> {
+                OHLCV o = new OHLCV();
+                o.setDate(c.getPriceDate());
+                o.setOpen(c.getOpen());
+                o.setHigh(c.getHigh());
+                o.setLow(c.getLow());
+                o.setClose(c.getClose());
+                o.setVolume(c.getVolume());
+                return o;
+            }).collect(Collectors.toList());
+
+            stockPricesJson.setOhlcvData(ohlcvDataList);
+            toSave.add(stockPricesJson);
+        }
+
+        stockPriceDataRepository.saveAll(toSave);
+        log.info("Created stock price data list with {} entries.", toSave.size());
+        return STR."Successfully saved stock price data to DB with size: \{toSave.size()}";
+    }
+
 }

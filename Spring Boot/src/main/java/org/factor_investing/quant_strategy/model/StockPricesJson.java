@@ -5,7 +5,9 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.factor_investing.quant_strategy.strategies.OHLCV;
 import org.hibernate.annotations.Type;
+import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
@@ -19,15 +21,12 @@ public class StockPricesJson {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-//    @Column(name = "stock_symbol")
-//    private String stockSymbol;
-
     @Type(JsonType.class)
     @Column(columnDefinition = "jsonb")
     private List<OHLCV> ohlcvData;
 
     @Enumerated(EnumType.STRING)
-    private AssetDataType nsseDataType;
+    private AssetDataType nseDataType;
 
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "stockSymbol", referencedColumnName = "symbol",nullable = false)
@@ -36,4 +35,7 @@ public class StockPricesJson {
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "IndexSymbol", referencedColumnName = "symbol")
     private NSE_ETFMasterData nse_etfMasterData;
+
+    @UpdateTimestamp
+    private LocalDateTime updatedOn;
 }
