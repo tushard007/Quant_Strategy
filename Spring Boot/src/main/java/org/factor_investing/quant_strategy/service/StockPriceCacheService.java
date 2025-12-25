@@ -5,7 +5,6 @@ import org.factor_investing.quant_strategy.model.AssetDataType;
 import org.factor_investing.quant_strategy.model.StockPricesJson;
 import org.factor_investing.quant_strategy.strategies.OHLCV;
 import org.factor_investing.quant_strategy.util.DateUtil;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationStartedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
@@ -50,9 +49,9 @@ public class StockPriceCacheService {
         List<StockPricesJson> stockPricesJsonList = stockDataService.getAllStockData();
         Map<String, List<OHLCV>> stockPriceDataMap = stockPricesJsonList.stream().
                 filter(stockPricesJson -> stockPricesJson.getNseDataType() == AssetDataType.INDEX &&
-                        stockPricesJson.getNse_etfMasterData().getSymbol() != null)
+                        stockPricesJson.getNseETFMasterData().getSymbol() != null)
                 .collect(Collectors.toMap(
-                        stockPrice -> stockPrice.getNse_etfMasterData().getSymbol(),
+                        stockPrice -> stockPrice.getNseETFMasterData().getSymbol(),
                         StockPricesJson::getOhlcvData
                 ));
         log.info("Retrieved all index price data with {} entries.", stockPriceDataMap.size());

@@ -34,7 +34,7 @@ public class StockPricesJson {
 
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "IndexSymbol", referencedColumnName = "symbol")
-    private NSE_ETFMasterData nse_etfMasterData;
+    private NSE_ETFMasterData nseETFMasterData;
 
     @UpdateTimestamp
     private LocalDateTime updatedOn;

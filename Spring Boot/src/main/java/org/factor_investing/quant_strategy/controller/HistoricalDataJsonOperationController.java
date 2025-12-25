@@ -11,11 +11,9 @@ import org.factor_investing.quant_strategy.repository.NSE_ETFMasterDataRepositor
 import org.factor_investing.quant_strategy.repository.StockDataRepository;
 import org.factor_investing.quant_strategy.service.UpstoxHistoricalDataService;
 import org.factor_investing.quant_strategy.strategies.OHLCV;
-import org.factor_investing.quant_strategy.util.DateUtil;
 import org.factor_investing.quant_strategy.util.JsonUtility;
 import org.springframework.web.bind.annotation.*;
 
-import java.text.ParseException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -99,8 +97,8 @@ public class HistoricalDataJsonOperationController {
                         if (spj.getNseStockMasterData() != null && spj.getNseStockMasterData().getSymbol() != null) {
                             if (spj.getNseStockMasterData().getSymbol().equalsIgnoreCase(symbol)) return true;
                         }
-                        if (spj.getNse_etfMasterData() != null && spj.getNse_etfMasterData().getSymbol() != null) {
-                            if (spj.getNse_etfMasterData().getSymbol().equalsIgnoreCase(symbol)) return true;
+                        if (spj.getNseETFMasterData() != null && spj.getNseETFMasterData().getSymbol() != null) {
+                            if (spj.getNseETFMasterData().getSymbol().equalsIgnoreCase(symbol)) return true;
                         }
                         return false;
                     })
@@ -123,7 +121,7 @@ public class HistoricalDataJsonOperationController {
                         .filter(d -> d.getSymbol() != null && d.getSymbol().equalsIgnoreCase(symbol))
                         .findFirst()
                         .orElse(null);
-                stockPricesJson.setNse_etfMasterData(etfMasterData);
+                stockPricesJson.setNseETFMasterData(etfMasterData);
                 stockPricesJson.setNseDataType(AssetDataType.INDEX);
             }
 
