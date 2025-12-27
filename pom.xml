@@ -10,7 +10,7 @@
     </parent>
     <groupId>org.factor_investing</groupId>
     <artifactId>Quant_Strategy</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.1</version>
     <name>Quant_Strategy</name>
     <description>Quant_Strategy</description>
     <url/>
