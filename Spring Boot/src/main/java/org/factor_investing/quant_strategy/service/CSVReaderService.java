@@ -4,18 +4,13 @@ import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Service;
-import org.springframework.util.ResourceUtils;
 import org.springframework.util.StringUtils;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -54,11 +49,10 @@ public class CSVReaderService {
                     while ((nextLine = csvReader.readNext()) != null) {
                         // Add data to corresponding column
                         for (int i = 0; i < headers.length; i++) {
-                            if (i < nextLine.length) {
-                                if (!StringUtils.trimAllWhitespace(nextLine[i]).isEmpty()) {
+                            if (i < nextLine.length && !StringUtils.trimAllWhitespace(nextLine[i]).isEmpty()) {
                                     columnData.get(headers[i]).add(nextLine[i]);
                                 }
-                            }
+
                         }
                     }
                 }

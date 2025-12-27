@@ -10,12 +10,15 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/technical-indicator")
 public class TechnicalIndicatorController {
-    @Autowired
-    private TechnicalIndicatorService technicalIndicatorService;
+    private final TechnicalIndicatorService technicalIndicatorService;
+
+    public TechnicalIndicatorController(TechnicalIndicatorService technicalIndicatorService) {
+        this.technicalIndicatorService = technicalIndicatorService;
+    }
 
     @GetMapping("EMAIndicator/{days}")
-    public void calculateEMAIndicator(@PathVariable(required = true) int days) {
-        technicalIndicatorService.emaIndicator(days);
+    public String calculateEMAIndicator(@PathVariable(required = true) int days) {
+       return technicalIndicatorService.calculateLatestEma(days);
     }
 
 

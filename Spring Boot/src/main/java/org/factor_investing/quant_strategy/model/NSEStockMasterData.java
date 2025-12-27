@@ -4,8 +4,6 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.sql.Date;
-
 @Entity
 @Getter
 @Setter
@@ -19,9 +17,7 @@ public class NSEStockMasterData {
     private String symbol;
     private String nameOfCompany;
     private String series;
-    private Date dateOfListing;
     private String isinNumber;
-    private String industry;
 
 
 }

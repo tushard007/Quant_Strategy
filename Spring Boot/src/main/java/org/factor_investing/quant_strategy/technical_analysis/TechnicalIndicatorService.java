@@ -10,6 +10,8 @@ import org.ta4j.core.indicators.averages.EMAIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.num.Num;
 
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -22,20 +24,50 @@ public class TechnicalIndicatorService {
     @Autowired
     private BarSeriesService barSeriesService;
 
-    public void emaIndicator(int barCount) {
+    /**
+     * Calculates the latest EMA value for each symbol from the cached OHLCV data.
+     * Returns a map of symbol -> latest EMA (ta4j Num). Logs and skips symbols with no data.
+     */
+    public String calculateLatestEma(int barCount) {
         Map<String, List<OHLCV>> stockData = stockPriceCacheService.getCachedAllStockPriceData();
+        Map<String, List<Double>> emaResults = new HashMap<>();
+
         stockData.forEach((symbol, ohlcvList) -> {
-            BarSeries series = barSeriesService.buildSeriesFromStockPrice(ohlcvList);
+            try {
+                if (ohlcvList == null || ohlcvList.isEmpty()) {
+                    log.debug("Skipping {}: no OHLCV data", symbol);
+                    return;
+                }
 
-            ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+                BarSeries series = barSeriesService.buildSeriesFromStockPrice(ohlcvList);
+                if (series == null || series.getBarCount() == 0) {
+                    log.debug("Skipping {}: built empty series", symbol);
+                    return;
+                }
 
-            EMAIndicator ema50 = new EMAIndicator(closePrice, barCount);
+                ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+                EMAIndicator ema = new EMAIndicator(closePrice, barCount);
 
-            int lastIndex = series.getEndIndex();
-            Num emaValue = ema50.getValue(lastIndex);
+                int lastIndex = series.getEndIndex();
+                if (lastIndex >= 0) {
+                    Num lastClose = series.getBar(lastIndex).getClosePrice();
+                    Num emaValue = ema.getValue(lastIndex);
 
-            log.info("Series for stock: {} built successfully", symbol);
-            log.info("ema ({}): {}", barCount, emaValue);
+                    if (!emaValue.isNaN() && !lastClose.isNaN()) {
+
+                        Num difference = lastClose.minus(emaValue);
+                        Num percentageDiff = difference.dividedBy(emaValue).multipliedBy(series.numFactory().hundred());
+
+                        emaResults.put(symbol, Arrays.asList(lastClose.doubleValue(), emaValue.doubleValue(), percentageDiff.doubleValue()));
+                        log.info("EMA({}) for {} = {}, lastClose = {}, diff = {}%", barCount, symbol, emaValue, lastClose, percentageDiff);
+                    } else {
+                        log.debug("Skipping {}: NaN values detected", symbol);
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Failed to compute EMA for {}: {}", symbol, e.getMessage(), e);
+            }
         });
+        return STR."EMA result calculated successfully for symbols:\{emaResults.size()}";
     }
 }

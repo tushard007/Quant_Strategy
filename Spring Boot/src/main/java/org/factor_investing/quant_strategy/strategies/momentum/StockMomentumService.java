@@ -39,7 +39,7 @@ public class StockMomentumService {
             if (AssetDataType.STOCK == assetDataType) {
                 stockData = stockPriceCacheService.getCachedAllStockPriceData();
             }
-            if (AssetDataType.INDEX == assetDataType) {
+            if (AssetDataType.ETF == assetDataType) {
                 stockData = stockPriceCacheService.getCachedAllIndexPriceData();
             }
             validateInput(stockData);
@@ -170,8 +170,8 @@ public class StockMomentumService {
         if(AssetDataType.STOCK==assetDataType) {
             momentumAssypeList = momentumAssypeList.stream().filter(stock -> stock.getAssetDataType() == AssetDataType.STOCK).collect(Collectors.toList());
         }
-        if(AssetDataType.INDEX==assetDataType) {
-            momentumAssypeList = momentumAssypeList.stream().filter(stock -> stock.getAssetDataType() == AssetDataType.INDEX).collect(Collectors.toList());
+        if(AssetDataType.ETF ==assetDataType) {
+            momentumAssypeList = momentumAssypeList.stream().filter(stock -> stock.getAssetDataType() == AssetDataType.ETF).collect(Collectors.toList());
         }
         // Rank by 12 months return
         rankMomentumAsset(momentumAssypeList, Comparator.comparing(TopN_MomentumAssetType::getPercentageReturn12Months).reversed(),

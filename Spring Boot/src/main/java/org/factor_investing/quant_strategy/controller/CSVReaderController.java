@@ -1,20 +1,22 @@
 package org.factor_investing.quant_strategy.controller;
 
 import org.factor_investing.quant_strategy.service.CSVReaderService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
 import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/read-csv")
 public class CSVReaderController {
-    @Autowired
-    private CSVReaderService readerService;
+    private final CSVReaderService readerService;
+
+    public CSVReaderController(CSVReaderService readerService) {
+        this.readerService = readerService;
+    }
+
     @GetMapping("/row/{filename}")
     public List<String[]> readRowWiseCsv(@PathVariable String filename) {
         try {

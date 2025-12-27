@@ -36,6 +36,9 @@ public class StockPricesJson {
     @JoinColumn(name = "IndexSymbol", referencedColumnName = "symbol")
     private NSE_ETFMasterData nseETFMasterData;
 
+    @Enumerated(EnumType.STRING)
+    private PriceFrequencey timeFrame;
+
     @UpdateTimestamp
     private LocalDateTime updatedOn;
 }

@@ -4,8 +4,6 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDate;
-import java.util.*;
-import java.util.stream.Collectors;
 
 @Getter
 @Setter
@@ -16,7 +14,7 @@ public class StockMomentum {
     private final Float sixMonthReturn;
     private final Float threeMonthReturn;
     private final boolean qualifiesForMomentum;
-    private final LocalDate StrategyRunDate;
+    private final LocalDate strategyRunDate;
 
     public StockMomentum(String stockName, Float oneYearReturn, Float sixMonthReturn, Float threeMonthReturn, LocalDate date) {
         this.stockName = stockName;
@@ -24,7 +22,7 @@ public class StockMomentum {
         this.sixMonthReturn = sixMonthReturn;
         this.threeMonthReturn = threeMonthReturn;
         this.qualifiesForMomentum = calculateQualification();
-        this.StrategyRunDate = date;
+        this.strategyRunDate = date;
     }
 
     private boolean calculateQualification() {

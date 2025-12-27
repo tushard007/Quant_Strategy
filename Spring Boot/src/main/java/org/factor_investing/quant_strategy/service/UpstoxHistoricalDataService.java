@@ -15,8 +15,11 @@ import org.factor_investing.quant_strategy.util.JsonUtility;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -24,7 +27,6 @@ public class UpstoxHistoricalDataService {
 
     private final NSE_StockDataService nseStockDataService;
     private final NSE_IndexDataService nseIndexDataService;
-    private final StockDataRepository stockPriceDataRepository;
     private final JsonUtility jsonUtility;
 
     @Autowired
@@ -33,17 +35,17 @@ public class UpstoxHistoricalDataService {
         this.nseIndexDataService = nseIndexDataService;
         this.nseStockDataService = nseStockDataService;
         this.jsonUtility = jsonUtility;
-        this.stockPriceDataRepository = stockPriceDataRepository;
     }
 
     public GetHistoricalCandleResponse getHistoricalCandleData(String instrumentKey, String timeFrame, int interval, String toDate, String fromDate) {
+
         HistoryV3Api historyV3Api = new HistoryV3Api();
         GetHistoricalCandleResponse result = null;
         try {
             result = historyV3Api.getHistoricalCandleData1(instrumentKey, timeFrame, interval, toDate, fromDate);
 
         } catch (ApiException e) {
-            System.err.println("Exception when calling HistoryV3Api->getHistoricalCandleData1");
+           log.error("Exception when calling HistoryV3Api->getHistoricalCandleData1");
         }
         return result;
     }

@@ -48,7 +48,7 @@ public class StockPriceCacheService {
     public Map<String, List<OHLCV>> getAllIndexPriceData() {
         List<StockPricesJson> stockPricesJsonList = stockDataService.getAllStockData();
         Map<String, List<OHLCV>> stockPriceDataMap = stockPricesJsonList.stream().
-                filter(stockPricesJson -> stockPricesJson.getNseDataType() == AssetDataType.INDEX &&
+                filter(stockPricesJson -> stockPricesJson.getNseDataType() == AssetDataType.ETF &&
                         stockPricesJson.getNseETFMasterData().getSymbol() != null)
                 .collect(Collectors.toMap(
                         stockPrice -> stockPrice.getNseETFMasterData().getSymbol(),
@@ -72,7 +72,7 @@ public class StockPriceCacheService {
         if(AssetDataType.STOCK==assetDataType) {
             allStockPriceData = getCachedAllStockPriceData();
         }
-        if(AssetDataType.INDEX==assetDataType) {
+        if(AssetDataType.ETF ==assetDataType) {
             allStockPriceData = getCachedAllIndexPriceData();
         }
         List<OHLCV> ohlcvList = allStockPriceData.get(symbol);
@@ -101,7 +101,7 @@ public class StockPriceCacheService {
         if(AssetDataType.STOCK==assetDataType) {
             allStockPriceData= getCachedAllStockPriceData();
        }
-        if(AssetDataType.INDEX==assetDataType) {
+        if(AssetDataType.ETF ==assetDataType) {
          allStockPriceData = getCachedAllIndexPriceData();
         }
         List<OHLCV> ohlcvList = allStockPriceData.get(symbol);

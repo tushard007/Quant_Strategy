@@ -2,20 +2,20 @@ package org.factor_investing.quant_strategy.service;
 
 import org.factor_investing.quant_strategy.model.NiftyIndexStock;
 import org.factor_investing.quant_strategy.repository.NiftyIndexRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @Service
 public class NiftyIndexService {
-    @Autowired
-    private NiftyIndexRepository niftyIndexRepository;
+    private final NiftyIndexRepository niftyIndexRepository;
+
+    public NiftyIndexService(NiftyIndexRepository niftyIndexRepository) {
+        this.niftyIndexRepository = niftyIndexRepository;
+    }
 
     public List<NiftyIndexStock> getNiftyIndexData() {
         return niftyIndexRepository.findAll();
