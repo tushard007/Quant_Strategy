@@ -1,0 +1,26 @@
+# -------------------------
+# Build Stage
+# -------------------------
+FROM maven:3.9.9-eclipse-temurin-17 AS builder
+
+WORKDIR /app
+
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
+
+COPY src ./src
+RUN mvn clean package -DskipTests
+
+# -------------------------
+# Runtime Stage
+# -------------------------
+FROM eclipse-temurin:17-jre
+
+WORKDIR /app
+
+COPY --from=builder /app/target/Quant_Strategy-1.0.1.jar app.jar
+
+EXPOSE 8091
+
+# Enable Java Preview Features
+ENTRYPOINT ["java", "--enable-preview", "-jar", "app.jar"]
