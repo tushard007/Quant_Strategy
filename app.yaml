@@ -5,3 +5,6 @@ entrypoint: java --enable-preview -jar target/*.jar
 
 env_variables:
   SPRING_PROFILES_ACTIVE: prod
+
+beta_settings:
+  cloud_sql_instances: cultivated-pen-482514-m6:asia-south1:my-postgres-instance
