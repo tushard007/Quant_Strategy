@@ -1,6 +1,10 @@
 steps:
-  - name: 'gcr.io/cloud-builders/mvn'
-    args: ['clean', 'package', '-DskipTests']
+  - name: eclipse-temurin:21-jdk
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        ./mvnw clean package -DskipTests
 
   - name: 'gcr.io/cloud-builders/gcloud'
     args: ['app', 'deploy', '--quiet']
