@@ -26,6 +26,12 @@ public class DateUtil {
         return end;
     }
 
+    public static String getCurrentDateTime() {
+        ZonedDateTime indianTime = ZonedDateTime.now(ZoneId.of("Asia/Kolkata"));
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
+        return indianTime.format(formatter);
+    }
+
     public static DayOfWeek getDayOfWeek(LocalDate date) {
         return date.getDayOfWeek();
     }

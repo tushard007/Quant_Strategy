@@ -7,10 +7,12 @@ import org.factor_investing.quant_strategy.strategies.OHLCV;
 import org.factor_investing.quant_strategy.util.DateUtil;
 import org.springframework.boot.context.event.ApplicationStartedEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
 import java.time.LocalDate;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -30,7 +32,7 @@ public class StockPriceCacheService {
         this.stockDataService = stockDataService;
     }
 
-    @PostConstruct
+    @Scheduled(cron = "0 0 18 * * MON-FRI", zone = "Asia/Kolkata")
     public Map<String, List<OHLCV>> getAllStockPriceData() {
         List<StockPricesJson> stockPricesJsonList = stockDataService.getAllStockData();
         Map<String, List<OHLCV>> stockPriceDataMap = stockPricesJsonList.stream().
@@ -40,11 +42,11 @@ public class StockPriceCacheService {
                         stockPrice -> stockPrice.getNseStockMasterData().getSymbol(),
                         StockPricesJson::getOhlcvData
                 ));
-        log.info("Retrieved all stock price data with {} entries.", stockPriceDataMap.size());
+        log.info("Retrieved all stock price data with {} entries.", stockPriceDataMap.size() +" on Date & time: "+ DateUtil.getCurrentDateTime());
         return stockPriceDataMap;
 
     }
-
+    @Scheduled(cron = "0 0 19 * * MON-FRI", zone = "Asia/Kolkata")
     public Map<String, List<OHLCV>> getAllIndexPriceData() {
         List<StockPricesJson> stockPricesJsonList = stockDataService.getAllStockData();
         Map<String, List<OHLCV>> stockPriceDataMap = stockPricesJsonList.stream().
@@ -54,7 +56,7 @@ public class StockPriceCacheService {
                         stockPrice -> stockPrice.getNseETFMasterData().getSymbol(),
                         StockPricesJson::getOhlcvData
                 ));
-        log.info("Retrieved all index price data with {} entries.", stockPriceDataMap.size());
+        log.info("Retrieved all index price data with {} entries.", stockPriceDataMap.size()+" on Date & time: "+ DateUtil.getCurrentDateTime());
         return stockPriceDataMap;
 
     }
@@ -139,9 +141,6 @@ public class StockPriceCacheService {
             return stockDataCache;
         }
 
-        // --- If cache is invalid or empty, fetch the data ---
-        log.warn("Cache is empty or expired. Fetching fresh data.");
-
         // This is where you call your actual data fetching logic.
         Map<String, List<OHLCV>> freshData = getAllStockPriceData();
 
@@ -163,9 +162,6 @@ public class StockPriceCacheService {
             log.info("Returning index data from cache."); // For logging/debugging
             return indexDataCache;
         }
-
-        // --- If cache is invalid or empty, fetch the data ---
-        log.warn("Cache is empty or expired. Fetching fresh index data.");
 
         // This is where you call your actual data fetching logic.
         Map<String, List<OHLCV>> freshIndexData = getAllIndexPriceData();
