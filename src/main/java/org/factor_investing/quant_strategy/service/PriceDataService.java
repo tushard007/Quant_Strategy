@@ -30,7 +30,6 @@ public class PriceDataService {
         this.stockPriceDataRepository = stockPriceDataRepository;
         this.nseStockDataService = nseStockDataService;
         this.upstoxHistoricalDataService = upstoxHistoricalDataService;
-
     }
 
     public String saveOrUpdateStockPriceData(PriceFrequencey timeFrame) throws ParseException {
@@ -130,7 +129,7 @@ public class PriceDataService {
         }
         stockPriceDataRepository.saveAll(toSave);
         log.info("Created stock price data list with {} entries.", toSave.size());
-        return STR."Successfully saved stock price data to DB with size: \{toSave.size()}";
+        return "Successfully saved stock price data to DB with size: "+toSave.size();
     }
 
     public String saveOrUpdateETFPriceData(PriceFrequencey timeFrame) throws ParseException {
@@ -147,7 +146,7 @@ public class PriceDataService {
 
             List<NSE_ETFMasterData>  indexDataList = upstoxHistoricalDataService.getNSEIndexData();
             for (NSE_ETFMasterData indexData : indexDataList) {
-                String instrumentKey = STR."NSE_EQ|\{indexData.getIsinNumber()}";
+                String instrumentKey = "NSE_EQ|"+indexData.getIsinNumber();
                 String stockName = indexData.getSecurityName();
                 log.info("Fetching historical candle data for Index: {}", stockName);
                 // Sleep for 3 seconds after every 100 calls to avoid rate limiting
