@@ -53,10 +53,12 @@ public class DateUtil {
         return Instant.ofEpochMilli(date.getTime()).atZone(ZoneId.systemDefault()).toLocalDate();
     }
 
-
-    public static Date convertLocalDateToDate(LocalDate localDate) throws ParseException {
-        return new SimpleDateFormat("yyyy-MM-dd").parse(localDate.toString());
+    public static Date convertLocalDateToDate(LocalDate localDate) {
+        return Date.from(
+                localDate.atStartOfDay(ZoneId.systemDefault()).toInstant()
+        );
     }
+
 
     public static LocalDate findNearestDate(Set<LocalDate> dateSet, LocalDate inputDate) {
         LocalDate nearestDate = null;
