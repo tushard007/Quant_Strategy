@@ -1,9 +1,8 @@
 package org.factor_investing.quant_strategy.controller;
 
 import lombok.extern.slf4j.Slf4j;
+import org.factor_investing.quant_strategy.model.AssetDataType;
 import org.factor_investing.quant_strategy.technical_analysis.TechnicalIndicatorService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -27,8 +26,8 @@ public class TechnicalIndicatorController {
     }
 
     @GetMapping("EMAIndicator/{days}")
-    public ResponseEntity<?> calculateEMAIndicator(@PathVariable(required = true) int days, @RequestParam(required = false) String download) {
-        Map<String, List<Double>> emaResults = technicalIndicatorService.calculateLatestEma(days);
+    public ResponseEntity<?> calculateEMAIndicator(@PathVariable(required = true) int days, @RequestParam(required = false) String download, @RequestParam(required = true)AssetDataType assetDataType) {
+        Map<String, List<Double>> emaResults = technicalIndicatorService.calculateLatestEma(days,assetDataType);
         // Check if Excel download is requested
         if ("excel".equalsIgnoreCase(download)) {
             // Generate Excel file
@@ -37,7 +36,7 @@ public class TechnicalIndicatorController {
             // Create filename with timestamp
             String timestamp = LocalDateTime.now()
                     .format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmm"));
-            String filename = "EMA_" + days + " " + timestamp + ".xlsx";
+            String filename = assetDataType.toString()+" EMA_" + days + " " + timestamp + ".xlsx";
 
             // Set response headers for Excel download
             HttpHeaders headers = new HttpHeaders();

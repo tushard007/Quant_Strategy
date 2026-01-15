@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.factor_investing.quant_strategy.model.AssetDataType;
 import org.factor_investing.quant_strategy.service.StockPriceCacheService;
 import org.factor_investing.quant_strategy.strategies.OHLCV;
 import org.springframework.stereotype.Service;
@@ -34,8 +35,14 @@ public class TechnicalIndicatorService {
      * Calculates the latest EMA value for each symbol from the cached OHLCV data.
      * Returns a map of symbol -> latest EMA (ta4j Num). Logs and skips symbols with no data.
      */
-    public Map<String, List<Double>> calculateLatestEma(int barCount) {
-        Map<String, List<OHLCV>> stockData = stockPriceCacheService.getCachedAllStockPriceData();
+    public Map<String, List<Double>> calculateLatestEma(int barCount, AssetDataType assetDataType) {
+        Map<String, List<OHLCV>> stockData =new HashMap<>();
+        if (AssetDataType.STOCK == assetDataType) {
+            stockData = stockPriceCacheService.getCachedAllStockPriceData();
+        }
+        if (AssetDataType.ETF == assetDataType) {
+            stockData = stockPriceCacheService.getCachedAllIndexPriceData();
+        }
         Map<String, List<Double>> emaResults = new TreeMap<>();
 
         stockData.forEach((symbol, ohlcvList) -> {
