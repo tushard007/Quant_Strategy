@@ -4,6 +4,8 @@ instance_class: F4
 automatic_scaling:
   max_instances: 2
 
+entrypoint: java --enable-preview -jar target/*.jar
+
 env_variables:
   SPRING_PROFILES_ACTIVE: prod
 
