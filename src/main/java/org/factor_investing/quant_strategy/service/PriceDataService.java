@@ -50,9 +50,7 @@ public class PriceDataService {
 
         String fromDate = beforeYearDate.format(formatter);
 
-        String interval = PriceFrequencey.WEEKLY.equals(timeFrame)
-                ? "weeks"
-                : "days";
+        String interval = PriceFrequencey.WEEKLY.equals(timeFrame) ? "weeks" : "days";
 
         List<NSEStockMasterData> stockDataList = nseStockDataService.getAllStockData();
 
@@ -75,22 +73,16 @@ public class PriceDataService {
 
             NSEStockMasterData stockData = stockDataList.get(i);
 
-            String instrumentKey =
-                    "NSE_EQ|" + stockData.getIsinNumber();
+            String instrumentKey = "NSE_EQ|" + stockData.getIsinNumber();
 
             String stockName = stockData.getNameOfCompany();
 
-            log.info(
-                    "Fetching historical candle data for stock: {} ({}/{})",
-                    stockName,
-                    i + 1,
-                    stockDataList.size()
-            );
+            log.info("Fetching historical candle data for stock: {} ({}/{})", stockName, i + 1, stockDataList.size());
 
             /*
              * Batch cooldown
              */
-            if (i > 0 && i % 100 == 0) {
+            if (i > 0 && i % 200 == 0) {
 
                 try {
 
@@ -118,7 +110,7 @@ public class PriceDataService {
              * Small delay after every request
              */
             try {
-                Thread.sleep(200);
+                Thread.sleep(300);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
@@ -130,22 +122,14 @@ public class PriceDataService {
 
                 log.info("Successfully fetched data for stock: {}", stockName);
 
-                result.add(
-                        getJavaObjectHistoricalData(
-                                response,
-                                stockData.getNameOfCompany(),
-                                stockData.getSymbol()
-                        )
-                );
+                result.add(getJavaObjectHistoricalData(response, stockData.getNameOfCompany(), stockData.getSymbol()));
 
             } else {
-
                 log.warn("No data found for stock: {}", stockName);
             }
         }
 
-        List<JGetHistoricalCandleResponse> historicalData =
-                result.stream().toList();
+        List<JGetHistoricalCandleResponse> historicalData = result.stream().toList();
 
         if (historicalData.isEmpty()) {
 
@@ -162,9 +146,7 @@ public class PriceDataService {
                         ));
 
         List<StockPricesJson> existingList =
-                stockPriceDataRepository.findByNseDataType(
-                        AssetDataType.STOCK
-                );
+                stockPriceDataRepository.findByNseDataType(AssetDataType.STOCK);
 
         /*
          * Existing DB records map
@@ -187,13 +169,11 @@ public class PriceDataService {
         List<StockPricesJson> toSave = new ArrayList<>();
 
         for (Map.Entry<String,
-                List<JGetHistoricalCandleResponse.CandleData>> entry
-                : stockDataMap.entrySet()) {
+                List<JGetHistoricalCandleResponse.CandleData>> entry : stockDataMap.entrySet()) {
 
             String symbol = entry.getKey();
 
-            List<JGetHistoricalCandleResponse.CandleData> candleDataList =
-                    entry.getValue();
+            List<JGetHistoricalCandleResponse.CandleData> candleDataList = entry.getValue();
 
             StockPricesJson stockPricesJson =
                     existingMap.getOrDefault(
@@ -234,13 +214,10 @@ public class PriceDataService {
 
         stockPriceDataRepository.saveAll(toSave);
 
-        log.info(
-                "Created stock price data list with {} entries.",
-                toSave.size()
+        log.info("Created stock price data list with {} entries.", toSave.size()
         );
 
-        return "Successfully saved stock price data to DB with size: "
-                + toSave.size();
+        return "Successfully saved stock price data to DB with size: " + toSave.size();
     }
 
 
@@ -259,9 +236,7 @@ public class PriceDataService {
         int retry = 0;
 
         while (retry < maxRetries) {
-
             try {
-
                 return upstoxHistoricalDataService
                         .getHistoricalCandleData(
                                 instrumentKey,
@@ -272,21 +247,12 @@ public class PriceDataService {
                         );
 
             } catch (Exception e) {
-
-                log.error(
-                        "Unexpected exception for instrument={}",
-                        instrumentKey,
-                        e
-                );
-
+                log.error("Unexpected exception for instrument={}", instrumentKey, e);
                 return null;
             }
         }
 
-        log.error(
-                "Max retries exceeded for instrument={}",
-                instrumentKey
-        );
+        log.error("Max retries exceeded for instrument={}", instrumentKey);
 
         return null;
     }
@@ -299,30 +265,21 @@ public class PriceDataService {
 
         LocalDate currentDate = LocalDate.now();
 
-        currentDate =
-                DateUtil.getFridayDateIfWeekend(currentDate);
+        currentDate = DateUtil.getFridayDateIfWeekend(currentDate);
 
-        DateTimeFormatter formatter =
-                DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
         String toDate = currentDate.format(formatter);
 
-        LocalDate beforeYearDate =
-                DateUtil.getDateBeforeYear(currentDate, 1);
+        LocalDate beforeYearDate = DateUtil.getDateBeforeYear(currentDate, 1);
 
-        beforeYearDate =
-                DateUtil.getFridayDateIfWeekend(beforeYearDate);
+        beforeYearDate = DateUtil.getFridayDateIfWeekend(beforeYearDate);
 
-        String fromDate =
-                beforeYearDate.format(formatter);
+        String fromDate = beforeYearDate.format(formatter);
 
-        String interval =
-                PriceFrequencey.WEEKLY.equals(timeFrame)
-                        ? "weeks"
-                        : "days";
+        String interval = PriceFrequencey.WEEKLY.equals(timeFrame) ? "weeks" : "days";
 
-        List<NSE_ETFMasterData> indexDataList =
-                upstoxHistoricalDataService.getNSEIndexData();
+        List<NSE_ETFMasterData> indexDataList = upstoxHistoricalDataService.getNSEIndexData();
 
         /*
          * ETF map for O(1) lookup
@@ -341,33 +298,23 @@ public class PriceDataService {
          */
         for (int i = 0; i < indexDataList.size(); i++) {
 
-            NSE_ETFMasterData indexData =
-                    indexDataList.get(i);
+            NSE_ETFMasterData indexData = indexDataList.get(i);
 
-            String instrumentKey =
-                    "NSE_EQ|" + indexData.getIsinNumber();
+            String instrumentKey = "NSE_EQ|" + indexData.getIsinNumber();
 
-            String stockName =
-                    indexData.getSecurityName();
+            String stockName = indexData.getSecurityName();
 
-            log.info(
-                    "Fetching historical candle data for ETF: {} ({}/{})",
-                    stockName,
-                    i + 1,
-                    indexDataList.size()
+            log.info("Fetching historical candle data for ETF: {} ({}/{})", stockName, i + 1, indexDataList.size()
             );
 
             /*
-             * Batch cooldown after every 100 requests
+             * Batch cooldown after every 150 requests
              */
-            if (i > 0 && i % 100 == 0) {
+            if (i > 0 && i % 150 == 0) {
 
                 try {
 
-                    log.info(
-                            "Cooling down after {} ETF API calls",
-                            i
-                    );
+                    log.info("Cooling down after {} ETF API calls", i);
 
                     Thread.sleep(5000);
 
@@ -375,10 +322,7 @@ public class PriceDataService {
 
                     Thread.currentThread().interrupt();
 
-                    log.error(
-                            "Thread interrupted during cooldown",
-                            e
-                    );
+                    log.error("Thread interrupted during cooldown", e);
                 }
             }
 
@@ -407,10 +351,7 @@ public class PriceDataService {
                     && response.getData().getCandles() != null
                     && !response.getData().getCandles().isEmpty()) {
 
-                log.info(
-                        "Successfully fetched data for ETF: {}",
-                        stockName
-                );
+                log.info("Successfully fetched data for ETF: {}", stockName);
 
                 result.add(
                         getJavaObjectHistoricalData(
@@ -422,15 +363,11 @@ public class PriceDataService {
 
             } else {
 
-                log.warn(
-                        "No data found for ETF: {}",
-                        stockName
-                );
+                log.warn("No data found for ETF: {}", stockName);
             }
         }
 
-        List<JGetHistoricalCandleResponse> historicalData =
-                result.stream().toList();
+        List<JGetHistoricalCandleResponse> historicalData = result.stream().toList();
 
         if (historicalData.isEmpty()) {
 
