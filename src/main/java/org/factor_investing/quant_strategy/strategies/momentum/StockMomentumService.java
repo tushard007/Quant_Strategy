@@ -165,7 +165,7 @@ public class StockMomentumService {
         return stockPriceCacheService.getStockClosingPriceBySymbolAndDate(stockName, priceDate,assetDataType);
     }
 
-    public void assignRanks(AssetDataType assetDataType) {
+    public void assignRanks_old(AssetDataType assetDataType) {
         List<TopN_MomentumAssetType> momentumAssypeList = topMomentumStockRepository.findAll();
         if(AssetDataType.STOCK==assetDataType) {
             momentumAssypeList = momentumAssypeList.stream().filter(stock -> stock.getAssetDataType() == AssetDataType.STOCK).collect(Collectors.toList());
@@ -206,7 +206,51 @@ public class StockMomentumService {
         IntStream.range(0, sorted.size())
                 .forEach(i -> rankSetter.accept(sorted.get(i), i + 1));
     }
+    
+    public void assignRanks(AssetDataType assetDataType) {
+        List<TopN_MomentumAssetType> momentumAssetList = topMomentumStockRepository.findAll();
+        if (AssetDataType.STOCK == assetDataType) {
+            momentumAssetList = momentumAssetList.stream()
+                    .filter(stock -> stock.getAssetDataType() == AssetDataType.STOCK)
+                    .collect(Collectors.toList());
+        }
+        if (AssetDataType.ETF == assetDataType) {
+            momentumAssetList = momentumAssetList.stream()
+                    .filter(stock -> stock.getAssetDataType() == AssetDataType.ETF)
+                    .collect(Collectors.toList());
+        }
 
+        // Rank by 12 months return (1 = highest return)
+        rankMomentumAsset(momentumAssetList,
+                Comparator.comparing(TopN_MomentumAssetType::getPercentageReturn12Months).reversed(),
+                TopN_MomentumAssetType::setRank12Months);
+
+        // Rank by 6 months return
+        rankMomentumAsset(momentumAssetList,
+                Comparator.comparing(TopN_MomentumAssetType::getPercentageReturn6Months).reversed(),
+                TopN_MomentumAssetType::setRank6Months);
+
+        // Rank by 3 months return
+        rankMomentumAsset(momentumAssetList,
+                Comparator.comparing(TopN_MomentumAssetType::getPercentageReturn3Months).reversed(),
+                TopN_MomentumAssetType::setRank3Months);
+
+        // === WEIGHTED TOTAL RANK SCORE (higher weight on 3-month) ===
+        final int WEIGHT_12M = 1;
+        final int WEIGHT_6M  = 2;
+        final int WEIGHT_3M  = 3;
+
+        momentumAssetList.forEach(stock -> {
+            int totalRank = stock.getRank12Months() * WEIGHT_12M
+                    + stock.getRank6Months()  * WEIGHT_6M
+                    + stock.getRank3Months()  * WEIGHT_3M;
+            stock.setTotalRankScore(totalRank);
+        });
+
+        // Save updated ranks back to the database
+        topMomentumStockRepository.saveAll(momentumAssetList);
+        log.info("Momentum rankings updated successfully (weighted: 3m>6m>12m).");
+    }
     private void validateInput(Map<String, List<OHLCV>> stockData) {
         if (stockData == null || stockData.isEmpty()) {
             throw new IllegalArgumentException("Stock data cannot be null or empty");

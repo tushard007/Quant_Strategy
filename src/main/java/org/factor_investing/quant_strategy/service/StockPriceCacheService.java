@@ -120,7 +120,8 @@ public class StockPriceCacheService {
 
 
     // Tracks when the cache was last successfully populated.
-    private long lastCacheTime = 0L;
+    private long lastStockCacheTime = 0L;
+    private long lastIndexCacheTime = 0L;
 
     // Set cache validity for 5 minutes.
     private static final long CACHE_DURATION_MS = TimeUnit.MINUTES.toMillis(60);
@@ -136,21 +137,12 @@ public class StockPriceCacheService {
         long currentTime = System.currentTimeMillis();
 
         // Check if the cache is populated and if it's still valid.
-        if (!stockDataCache.isEmpty() && (currentTime - lastCacheTime < CACHE_DURATION_MS)) {
+        if (!stockDataCache.isEmpty() && (currentTime - lastStockCacheTime < CACHE_DURATION_MS)) {
             log.info("Returning data from cache."); // For logging/debugging
             return stockDataCache;
         }
 
-        // This is where you call your actual data fetching logic.
-        Map<String, List<OHLCV>> freshData = getAllStockPriceData();
-
-        // --- Update the cache ---
-        // We clear and then putAll to ensure the cache is completely fresh.
-        this.stockDataCache.clear();
-        this.stockDataCache.putAll(freshData);
-        this.lastCacheTime = currentTime; // Update the timestamp
-        log.info(" fresh cache size: {}", this.stockDataCache.size());
-        return this.stockDataCache;
+        return refreshStockPriceDataCache();
     }
 
     @EventListener(ApplicationStartedEvent.class)
@@ -158,22 +150,32 @@ public class StockPriceCacheService {
         long currentTime = System.currentTimeMillis();
 
         // Check if the cache is populated and if it's still valid.
-        if (!indexDataCache.isEmpty() && (currentTime - lastCacheTime < CACHE_DURATION_MS)) {
+        if (!indexDataCache.isEmpty() && (currentTime - lastIndexCacheTime < CACHE_DURATION_MS)) {
             log.info("Returning index data from cache."); // For logging/debugging
             return indexDataCache;
         }
 
-        // This is where you call your actual data fetching logic.
+        return refreshIndexPriceDataCache();
+    }
+
+    public Map<String, List<OHLCV>> refreshStockPriceDataCache() {
+        Map<String, List<OHLCV>> freshData = getAllStockPriceData();
+
+        this.stockDataCache.clear();
+        this.stockDataCache.putAll(freshData);
+        this.lastStockCacheTime = System.currentTimeMillis();
+        log.info(" fresh cache size: {}", this.stockDataCache.size());
+        return this.stockDataCache;
+    }
+
+    public Map<String, List<OHLCV>> refreshIndexPriceDataCache() {
         Map<String, List<OHLCV>> freshIndexData = getAllIndexPriceData();
 
-        // --- Update the cache ---
-        // We clear and then putAll to ensure the cache is completely fresh.
         this.indexDataCache.clear();
         this.indexDataCache.putAll(freshIndexData);
-        this.lastCacheTime = currentTime; // Update the timestamp
+        this.lastIndexCacheTime = System.currentTimeMillis();
         log.info(" fresh Index cache size: {}", this.indexDataCache.size());
         return this.indexDataCache;
     }
 
 }
-

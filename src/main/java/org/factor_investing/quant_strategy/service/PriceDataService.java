@@ -13,9 +13,13 @@ import java.text.ParseException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -218,6 +222,499 @@ public class PriceDataService {
         );
 
         return "Successfully saved stock price data to DB with size: " + toSave.size();
+    }
+
+    public String updateStockPriceDataFromLastDate() throws ParseException {
+
+        PriceFrequencey timeFrame = PriceFrequencey.DAILY;
+
+        LocalDate currentDate = DateUtil.getFridayDateIfWeekend(LocalDate.now());
+
+        String toDate = currentDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+
+        String interval = "days";
+
+        List<StockPricesJson> existingList =
+                stockPriceDataRepository.findByNseDataType(AssetDataType.STOCK);
+
+        if (existingList == null || existingList.isEmpty()) {
+
+            log.info("No existing stock price data found. Running full daily stock price update.");
+
+            return saveOrUpdateStockPriceData(timeFrame);
+        }
+
+        Map<String, StockPricesJson> existingMap =
+                existingList.stream()
+                        .filter(Objects::nonNull)
+                        .filter(spj ->
+                                spj.getNseStockMasterData() != null
+                                        && spj.getNseStockMasterData().getSymbol() != null
+                        )
+                        .collect(Collectors.toMap(
+                                spj -> spj.getNseStockMasterData()
+                                        .getSymbol()
+                                        .toLowerCase(),
+                                Function.identity(),
+                                (a, b) -> a
+                        ));
+
+        List<NSEStockMasterData> stockDataList = nseStockDataService.getAllStockData();
+
+        List<StockPricesJson> toSave = new ArrayList<>();
+
+        int skippedCount = 0;
+
+        for (int i = 0; i < stockDataList.size(); i++) {
+
+            NSEStockMasterData stockData = stockDataList.get(i);
+
+            if (stockData.getSymbol() == null) {
+
+                continue;
+            }
+
+            StockPricesJson stockPricesJson =
+                    existingMap.get(stockData.getSymbol().toLowerCase());
+
+            Optional<LocalDate> lastPriceDate =
+                    getLastPriceDate(stockPricesJson);
+
+            if (lastPriceDate.isPresent()
+                    && !lastPriceDate.get().isBefore(currentDate)) {
+
+                skippedCount++;
+
+                continue;
+            }
+
+            LocalDate fromLocalDate =
+                    lastPriceDate.orElse(DateUtil.getDateBeforeYear(currentDate, 1));
+
+            fromLocalDate = DateUtil.getFridayDateIfWeekend(fromLocalDate);
+
+            String fromDate =
+                    fromLocalDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+
+            String instrumentKey = "NSE_EQ|" + stockData.getIsinNumber();
+
+            log.info(
+                    "Fetching startup stock price update for stock: {} from {} to {} ({}/{})",
+                    stockData.getNameOfCompany(),
+                    fromDate,
+                    toDate,
+                    i + 1,
+                    stockDataList.size()
+            );
+
+            if (i > 0 && i % 200 == 0) {
+
+                try {
+
+                    log.info("Cooling down after {} startup stock API calls", i);
+
+                    Thread.sleep(5000);
+
+                } catch (InterruptedException e) {
+
+                    Thread.currentThread().interrupt();
+
+                    log.error("Thread interrupted during startup stock update cooldown", e);
+
+                    break;
+                }
+            }
+
+            GetHistoricalCandleResponse response =
+                    fetchHistoricalDataWithRetry(
+                            instrumentKey,
+                            interval,
+                            toDate,
+                            fromDate
+                    );
+
+            try {
+
+                Thread.sleep(300);
+
+            } catch (InterruptedException e) {
+
+                Thread.currentThread().interrupt();
+
+                log.error("Thread interrupted during startup stock update delay", e);
+
+                break;
+            }
+
+            if (response == null
+                    || response.getData() == null
+                    || response.getData().getCandles() == null
+                    || response.getData().getCandles().isEmpty()) {
+
+                log.warn("No startup update data found for stock: {}", stockData.getNameOfCompany());
+
+                continue;
+            }
+
+            JGetHistoricalCandleResponse historicalData =
+                    getJavaObjectHistoricalData(
+                            response,
+                            stockData.getNameOfCompany(),
+                            stockData.getSymbol()
+                    );
+
+            StockPricesJson updatedStockPricesJson =
+                    stockPricesJson != null ? stockPricesJson : new StockPricesJson();
+
+            updatedStockPricesJson.setNseStockMasterData(stockData);
+
+            updatedStockPricesJson.setNseDataType(AssetDataType.STOCK);
+
+            updatedStockPricesJson.setTimeFrame(timeFrame);
+
+            updatedStockPricesJson.setOhlcvData(
+                    mergeOhlcvData(
+                            updatedStockPricesJson.getOhlcvData(),
+                            historicalData.getData()
+                    )
+            );
+
+            toSave.add(updatedStockPricesJson);
+        }
+
+        if (!toSave.isEmpty()) {
+
+            stockPriceDataRepository.saveAll(toSave);
+        }
+
+        log.info(
+                "Startup stock price update completed. Updated: {}, skipped current: {}",
+                toSave.size(),
+                skippedCount
+        );
+
+        return "Startup stock price update completed. Updated: "
+                + toSave.size()
+                + ", skipped current: "
+                + skippedCount;
+    }
+
+    public String updateETFPriceDataFromLastDate() throws ParseException {
+
+        PriceFrequencey timeFrame = PriceFrequencey.DAILY;
+
+        LocalDate currentDate = DateUtil.getFridayDateIfWeekend(LocalDate.now());
+
+        String toDate = currentDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+
+        String interval = "days";
+
+        List<StockPricesJson> existingList =
+                stockPriceDataRepository.findByNseDataType(AssetDataType.ETF);
+
+        if (existingList == null || existingList.isEmpty()) {
+
+            log.info("No existing ETF price data found. Running full daily ETF price update.");
+
+            return saveOrUpdateETFPriceData(timeFrame);
+        }
+
+        Map<String, StockPricesJson> existingMap =
+                existingList.stream()
+                        .filter(Objects::nonNull)
+                        .filter(spj ->
+                                spj.getNseETFMasterData() != null
+                                        && spj.getNseETFMasterData().getSymbol() != null
+                        )
+                        .collect(Collectors.toMap(
+                                spj -> spj.getNseETFMasterData()
+                                        .getSymbol()
+                                        .toLowerCase(),
+                                Function.identity(),
+                                (a, b) -> a
+                        ));
+
+        List<NSE_ETFMasterData> indexDataList = upstoxHistoricalDataService.getNSEIndexData();
+
+        List<StockPricesJson> toSave = new ArrayList<>();
+
+        int skippedCount = 0;
+
+        for (int i = 0; i < indexDataList.size(); i++) {
+
+            NSE_ETFMasterData indexData = indexDataList.get(i);
+
+            if (indexData.getSymbol() == null) {
+
+                continue;
+            }
+
+            StockPricesJson stockPricesJson =
+                    existingMap.get(indexData.getSymbol().toLowerCase());
+
+            Optional<LocalDate> lastPriceDate =
+                    getLastPriceDate(stockPricesJson);
+
+            if (lastPriceDate.isPresent()
+                    && !lastPriceDate.get().isBefore(currentDate)) {
+
+                skippedCount++;
+
+                continue;
+            }
+
+            LocalDate fromLocalDate =
+                    lastPriceDate.orElse(DateUtil.getDateBeforeYear(currentDate, 1));
+
+            fromLocalDate = DateUtil.getFridayDateIfWeekend(fromLocalDate);
+
+            String fromDate =
+                    fromLocalDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+
+            String instrumentKey = "NSE_EQ|" + indexData.getIsinNumber();
+
+            log.info(
+                    "Fetching startup ETF price update for ETF: {} from {} to {} ({}/{})",
+                    indexData.getSecurityName(),
+                    fromDate,
+                    toDate,
+                    i + 1,
+                    indexDataList.size()
+            );
+
+            if (i > 0 && i % 150 == 0) {
+
+                try {
+
+                    log.info("Cooling down after {} startup ETF API calls", i);
+
+                    Thread.sleep(5000);
+
+                } catch (InterruptedException e) {
+
+                    Thread.currentThread().interrupt();
+
+                    log.error("Thread interrupted during startup ETF update cooldown", e);
+
+                    break;
+                }
+            }
+
+            GetHistoricalCandleResponse response =
+                    fetchHistoricalDataWithRetry(
+                            instrumentKey,
+                            interval,
+                            toDate,
+                            fromDate
+                    );
+
+            try {
+
+                Thread.sleep(200);
+
+            } catch (InterruptedException e) {
+
+                Thread.currentThread().interrupt();
+
+                log.error("Thread interrupted during startup ETF update delay", e);
+
+                break;
+            }
+
+            if (response == null
+                    || response.getData() == null
+                    || response.getData().getCandles() == null
+                    || response.getData().getCandles().isEmpty()) {
+
+                log.warn("No startup update data found for ETF: {}", indexData.getSecurityName());
+
+                continue;
+            }
+
+            JGetHistoricalCandleResponse historicalData =
+                    getJavaObjectHistoricalData(
+                            response,
+                            indexData.getSecurityName(),
+                            indexData.getSymbol()
+                    );
+
+            StockPricesJson updatedStockPricesJson =
+                    stockPricesJson != null ? stockPricesJson : new StockPricesJson();
+
+            updatedStockPricesJson.setNseETFMasterData(indexData);
+
+            updatedStockPricesJson.setNseDataType(AssetDataType.ETF);
+
+            updatedStockPricesJson.setTimeFrame(timeFrame);
+
+            updatedStockPricesJson.setOhlcvData(
+                    mergeOhlcvData(
+                            updatedStockPricesJson.getOhlcvData(),
+                            historicalData.getData()
+                    )
+            );
+
+            toSave.add(updatedStockPricesJson);
+        }
+
+        if (!toSave.isEmpty()) {
+
+            stockPriceDataRepository.saveAll(toSave);
+        }
+
+        log.info(
+                "Startup ETF price update completed. Updated: {}, skipped current: {}",
+                toSave.size(),
+                skippedCount
+        );
+
+        return "Startup ETF price update completed. Updated: "
+                + toSave.size()
+                + ", skipped current: "
+                + skippedCount;
+    }
+
+    public boolean isPriceDataUpdatedTillCurrentTradingDate(AssetDataType assetDataType) {
+
+        LocalDate currentDate = DateUtil.getFridayDateIfWeekend(LocalDate.now());
+
+        List<StockPricesJson> existingList =
+                stockPriceDataRepository.findByNseDataType(assetDataType);
+
+        if (existingList == null || existingList.isEmpty()) {
+
+            return false;
+        }
+
+        Map<String, StockPricesJson> existingMap =
+                existingList.stream()
+                        .filter(Objects::nonNull)
+                        .filter(stockPricesJson -> getAssetSymbol(stockPricesJson, assetDataType) != null)
+                        .collect(Collectors.toMap(
+                                stockPricesJson -> getAssetSymbol(stockPricesJson, assetDataType).toLowerCase(),
+                                Function.identity(),
+                                (a, b) -> a
+                        ));
+
+        if (AssetDataType.STOCK == assetDataType) {
+
+            return nseStockDataService.getAllStockData().stream()
+                    .filter(stockData -> stockData.getSymbol() != null)
+                    .allMatch(stockData ->
+                            isAssetUpdatedTillCurrentTradingDate(
+                                    existingMap.get(stockData.getSymbol().toLowerCase()),
+                                    currentDate
+                            )
+                    );
+        }
+
+        return upstoxHistoricalDataService.getNSEIndexData().stream()
+                .filter(indexData -> indexData.getSymbol() != null)
+                .allMatch(indexData ->
+                        isAssetUpdatedTillCurrentTradingDate(
+                                existingMap.get(indexData.getSymbol().toLowerCase()),
+                                currentDate
+                        )
+                );
+    }
+
+    private String getAssetSymbol(StockPricesJson stockPricesJson, AssetDataType assetDataType) {
+
+        if (AssetDataType.STOCK == assetDataType
+                && stockPricesJson.getNseStockMasterData() != null) {
+
+            return stockPricesJson.getNseStockMasterData().getSymbol();
+        }
+
+        if (AssetDataType.ETF == assetDataType
+                && stockPricesJson.getNseETFMasterData() != null) {
+
+            return stockPricesJson.getNseETFMasterData().getSymbol();
+        }
+
+        return null;
+    }
+
+    private boolean isAssetUpdatedTillCurrentTradingDate(
+            StockPricesJson stockPricesJson,
+            LocalDate currentDate
+    ) {
+
+        return getLastPriceDate(stockPricesJson)
+                .map(lastPriceDate -> !lastPriceDate.isBefore(currentDate))
+                .orElse(false);
+    }
+
+    private Optional<LocalDate> getLastPriceDate(StockPricesJson stockPricesJson) {
+
+        if (stockPricesJson == null
+                || stockPricesJson.getOhlcvData() == null
+                || stockPricesJson.getOhlcvData().isEmpty()) {
+
+            return Optional.empty();
+        }
+
+        return stockPricesJson.getOhlcvData().stream()
+                .filter(Objects::nonNull)
+                .map(OHLCV::getDate)
+                .filter(Objects::nonNull)
+                .map(DateUtil::convertDateToLocalDate)
+                .max(Comparator.naturalOrder());
+    }
+
+    private List<OHLCV> mergeOhlcvData(
+            List<OHLCV> existingData,
+            List<JGetHistoricalCandleResponse.CandleData> newData
+    ) {
+
+        Map<LocalDate, OHLCV> mergedDataByDate =
+                new LinkedHashMap<>();
+
+        if (existingData != null) {
+
+            for (OHLCV ohlcv : existingData) {
+
+                if (ohlcv != null && ohlcv.getDate() != null) {
+
+                    mergedDataByDate.put(
+                            DateUtil.convertDateToLocalDate(ohlcv.getDate()),
+                            ohlcv
+                    );
+                }
+            }
+        }
+
+        if (newData != null) {
+
+            for (JGetHistoricalCandleResponse.CandleData candleData : newData) {
+
+                if (candleData == null || candleData.getPriceDate() == null) {
+
+                    continue;
+                }
+
+                OHLCV ohlcv = new OHLCV();
+
+                Date priceDate = candleData.getPriceDate();
+
+                ohlcv.setDate(priceDate);
+                ohlcv.setOpen(candleData.getOpen());
+                ohlcv.setHigh(candleData.getHigh());
+                ohlcv.setLow(candleData.getLow());
+                ohlcv.setClose(candleData.getClose());
+                ohlcv.setVolume(candleData.getVolume());
+
+                mergedDataByDate.put(
+                        DateUtil.convertDateToLocalDate(priceDate),
+                        ohlcv
+                );
+            }
+        }
+
+        return mergedDataByDate.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(Map.Entry::getValue)
+                .collect(Collectors.toList());
     }
 
 

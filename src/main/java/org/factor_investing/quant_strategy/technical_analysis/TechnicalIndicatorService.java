@@ -10,9 +10,9 @@ import org.factor_investing.quant_strategy.service.StockPriceCacheService;
 import org.factor_investing.quant_strategy.strategies.OHLCV;
 import org.springframework.stereotype.Service;
 import org.ta4j.core.BarSeries;
+import org.ta4j.core.indicators.ATRIndicator;
 import org.ta4j.core.indicators.averages.EMAIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
-import org.ta4j.core.indicators.supertrend.SuperTrendIndicator;
 import org.ta4j.core.num.Num;
 
 import java.io.ByteArrayOutputStream;
@@ -116,39 +116,91 @@ public class TechnicalIndicatorService {
                     return;
                 }
 
-                SuperTrendIndicator superTrend = new SuperTrendIndicator(series, barCount, multiplier);
-
-                int lastIndex = series.getEndIndex();
-                if (lastIndex >= 0) {
-                    Num lastClose = series.getBar(lastIndex).getClosePrice();
-                    Num superTrendValue = superTrend.getValue(lastIndex);
-                    Num upperBand = superTrend.getSuperTrendUpperBandIndicator().getValue(lastIndex);
-                    Num lowerBand = superTrend.getSuperTrendLowerBandIndicator().getValue(lastIndex);
-
-                    if (!superTrendValue.isNaN() && !lastClose.isNaN()) {
-                        Num difference = lastClose.minus(superTrendValue);
-                        Num percentageDiff = difference.dividedBy(superTrendValue).multipliedBy(series.numFactory().hundred());
-                        String trend = lastClose.isGreaterThan(superTrendValue) ? "BULLISH" : "BEARISH";
-
-                        superTrendResults.put(symbol, new SuperTrendResult(
-                                lastClose.doubleValue(),
-                                superTrendValue.doubleValue(),
-                                percentageDiff.doubleValue(),
-                                upperBand.doubleValue(),
-                                lowerBand.doubleValue(),
-                                trend
-                        ));
-                        log.info("SuperTrend({}, {}, {}) for {} = {}, lastClose = {}, diff = {}%, trend = {}",
-                                barCount, multiplier, priceFrequencey, symbol, superTrendValue, lastClose, percentageDiff, trend);
-                    } else {
-                        log.debug("Skipping {}: NaN values detected", symbol);
-                    }
+                SuperTrendResult result = calculateSuperTrendResult(series, barCount, multiplier);
+                if (result != null) {
+                    superTrendResults.put(symbol, result);
+                    log.info("SuperTrend({}, {}, {}) for {} = {}, lastClose = {}, diff = {}%, trend = {}",
+                            barCount, multiplier, priceFrequencey, symbol, result.getSuperTrendValue(),
+                            result.getClosingPrice(), result.getPercentageDifference(), result.getTrend());
+                } else {
+                    log.debug("Skipping {}: insufficient valid Supertrend data", symbol);
                 }
             } catch (Exception e) {
                 log.error("Failed to compute Supertrend for {}: {}", symbol, e.getMessage(), e);
             }
         });
         return superTrendResults;
+    }
+
+    private SuperTrendResult calculateSuperTrendResult(BarSeries series, int barCount, double multiplier) {
+        ATRIndicator atrIndicator = new ATRIndicator(series, barCount);
+
+        double previousFinalUpperBand = Double.NaN;
+        double previousFinalLowerBand = Double.NaN;
+        double previousSuperTrend = Double.NaN;
+        SuperTrendResult latestResult = null;
+
+        for (int i = 0; i <= series.getEndIndex(); i++) {
+            Num atr = atrIndicator.getValue(i);
+            Num close = series.getBar(i).getClosePrice();
+            if (atr.isNaN() || close.isNaN()) {
+                continue;
+            }
+
+            double high = series.getBar(i).getHighPrice().doubleValue();
+            double low = series.getBar(i).getLowPrice().doubleValue();
+            double closeValue = close.doubleValue();
+            double medianPrice = (high + low) / 2;
+            double basicUpperBand = medianPrice + (multiplier * atr.doubleValue());
+            double basicLowerBand = medianPrice - (multiplier * atr.doubleValue());
+
+            double previousClose = i > 0 ? series.getBar(i - 1).getClosePrice().doubleValue() : closeValue;
+            double finalUpperBand = (Double.isNaN(previousFinalUpperBand)
+                    || basicUpperBand < previousFinalUpperBand
+                    || previousClose > previousFinalUpperBand)
+                    ? basicUpperBand
+                    : previousFinalUpperBand;
+            double finalLowerBand = (Double.isNaN(previousFinalLowerBand)
+                    || basicLowerBand > previousFinalLowerBand
+                    || previousClose < previousFinalLowerBand)
+                    ? basicLowerBand
+                    : previousFinalLowerBand;
+
+            double superTrendValue;
+            if (Double.isNaN(previousSuperTrend)) {
+                superTrendValue = closeValue <= finalUpperBand ? finalUpperBand : finalLowerBand;
+            } else if (approximatelyEqual(previousSuperTrend, previousFinalUpperBand)) {
+                superTrendValue = closeValue <= finalUpperBand ? finalUpperBand : finalLowerBand;
+            } else {
+                superTrendValue = closeValue >= finalLowerBand ? finalLowerBand : finalUpperBand;
+            }
+
+            if (Double.isFinite(superTrendValue) && superTrendValue != 0) {
+                double percentageDiff = ((closeValue - superTrendValue) / superTrendValue) * 100;
+                String trend = closeValue > superTrendValue ? "BULLISH" : "BEARISH";
+                latestResult = new SuperTrendResult(
+                        closeValue,
+                        superTrendValue,
+                        percentageDiff,
+                        finalUpperBand,
+                        finalLowerBand,
+                        trend
+                );
+            }
+
+            previousFinalUpperBand = finalUpperBand;
+            previousFinalLowerBand = finalLowerBand;
+            previousSuperTrend = superTrendValue;
+        }
+
+        return latestResult;
+    }
+
+    private boolean approximatelyEqual(double first, double second) {
+        if (!Double.isFinite(first) || !Double.isFinite(second)) {
+            return false;
+        }
+        return Math.abs(first - second) < 0.0000001;
     }
 
     private Map<String, List<OHLCV>> getPriceData(AssetDataType assetDataType) {
