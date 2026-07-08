@@ -25,16 +25,9 @@ public class StockPricesJson {
     @Column(columnDefinition = "jsonb")
     private List<OHLCV> ohlcvData;
 
-    @Enumerated(EnumType.STRING)
-    private AssetDataType nseDataType;
-
-    @OneToOne(cascade = CascadeType.ALL)
-    @JoinColumn(name = "stockSymbol", referencedColumnName = "symbol",nullable = false)
+    @OneToOne
+    @JoinColumn(name = "stock_symbol", referencedColumnName = "symbol", nullable = false)
     private NSEStockMasterData nseStockMasterData;
-
-    @OneToOne(cascade = CascadeType.ALL)
-    @JoinColumn(name = "IndexSymbol", referencedColumnName = "symbol")
-    private NSE_ETFMasterData nseETFMasterData;
 
     @Enumerated(EnumType.STRING)
     private PriceFrequencey timeFrame;

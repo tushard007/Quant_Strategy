@@ -51,7 +51,7 @@ public class JsonUtility {
 
             // Generate filename with priceDate
             String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-            String filePath = STR."\{BASE_PATH}\{prefix}.json";
+            String filePath = BASE_PATH + prefix + ".json";
 
             // Write JSON to file
             objectWriter.writeValue(new File(filePath), data);

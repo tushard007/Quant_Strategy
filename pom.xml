@@ -152,9 +152,6 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.4</version>
-                <configuration>
-                    <argLine>--enable-preview</argLine>
-                </configuration>
             </plugin>
           <plugin>
             <groupId>org.springframework.boot</groupId>
@@ -174,9 +171,6 @@
                 <version>3.11.0</version>
                 <configuration>
                     <release>21</release> <!-- or your Java version -->
-                    <compilerArgs>
-                        <arg>--enable-preview</arg>
-                    </compilerArgs>
                 </configuration>
             </plugin>
         </plugins>

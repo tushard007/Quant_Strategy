@@ -27,13 +27,13 @@ public class ReturnCalculationUtils {
             float priceReturn = ((closingPrice - startingPrice) / startingPrice) * 100;
             return Float.parseFloat(df.format(priceReturn));
         } catch (NumberFormatException e) {
-            log.error(STR."Error formatting the price return: \{e.getMessage()}");
+            log.error("Error formatting the price return: {}", e.getMessage());
             return 0.0f;
         } catch (IllegalArgumentException e) {
-            log.error(STR."Invalid input: \{e.getMessage()}");
+            log.error("Invalid input: {}", e.getMessage());
             return 0.0f;
         } catch (Exception e) {
-            log.error(STR."An unexpected error occurred: \{e.getMessage()}");
+            log.error("An unexpected error occurred: {}", e.getMessage());
             return 0.0f;
         }
     }

@@ -208,6 +208,9 @@ public class TechnicalIndicatorService {
             return stockPriceCacheService.getCachedAllStockPriceData();
         }
         if (AssetDataType.ETF == assetDataType) {
+            return stockPriceCacheService.getCachedAllETFPriceData();
+        }
+        if (AssetDataType.INDEX == assetDataType) {
             return stockPriceCacheService.getCachedAllIndexPriceData();
         }
         return new HashMap<>();

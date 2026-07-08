@@ -29,6 +29,11 @@ public class PriceDataController {
         return priceDataService.saveOrUpdateETFPriceData(timeFrame);
     }
 
+    @PostMapping("/index-Price/{timeFrame}")
+    public String saveOrUpdateIndexPriceData(@PathVariable PriceFrequencey timeFrame) throws ParseException {
+        return priceDataService.saveOrUpdateIndexPriceData(timeFrame);
+    }
+
     @Scheduled(cron = "0 0 16 * * MON-FRI", zone = "Asia/Kolkata")
     public void updateETFPriceData() throws ParseException {
         log.info("Starting scheduled at 4 PM IST (Weekdays only) for etf price update");

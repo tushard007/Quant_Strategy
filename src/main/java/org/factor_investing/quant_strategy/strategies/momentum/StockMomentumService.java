@@ -40,6 +40,9 @@ public class StockMomentumService {
                 stockData = stockPriceCacheService.getCachedAllStockPriceData();
             }
             if (AssetDataType.ETF == assetDataType) {
+                stockData = stockPriceCacheService.getCachedAllETFPriceData();
+            }
+            if (AssetDataType.INDEX == assetDataType) {
                 stockData = stockPriceCacheService.getCachedAllIndexPriceData();
             }
             validateInput(stockData);
@@ -70,7 +73,7 @@ public class StockMomentumService {
                     }
                 } catch (Exception e) {
                     // Log error but continue with other stocks
-                    System.err.println(STR."Error calculating momentum for \{stockName}: \{e.getMessage()}");
+                    System.err.println("Error calculating momentum for " + stockName + ": " + e.getMessage());
                 }
                 log.info("Calculation in progress remaining stock to process: {}", stockData.size() - count);
             }
@@ -153,7 +156,12 @@ public class StockMomentumService {
                 return null;
             }
         } else {
-            log.error(STR."Insufficient data points for \{stockName}. Required: \{MomentumConstants.MIN_DATA_POINTS}, Provided: \{ohlcData.size()}");
+            log.error(
+                    "Insufficient data points for {}. Required: {}, Provided: {}",
+                    stockName,
+                    MomentumConstants.MIN_DATA_POINTS,
+                    ohlcData.size()
+            );
             return null;
         }
     }
@@ -172,6 +180,9 @@ public class StockMomentumService {
         }
         if(AssetDataType.ETF ==assetDataType) {
             momentumAssypeList = momentumAssypeList.stream().filter(stock -> stock.getAssetDataType() == AssetDataType.ETF).collect(Collectors.toList());
+        }
+        if(AssetDataType.INDEX ==assetDataType) {
+            momentumAssypeList = momentumAssypeList.stream().filter(stock -> stock.getAssetDataType() == AssetDataType.INDEX).collect(Collectors.toList());
         }
         // Rank by 12 months return
         rankMomentumAsset(momentumAssypeList, Comparator.comparing(TopN_MomentumAssetType::getPercentageReturn12Months).reversed(),
@@ -217,6 +228,11 @@ public class StockMomentumService {
         if (AssetDataType.ETF == assetDataType) {
             momentumAssetList = momentumAssetList.stream()
                     .filter(stock -> stock.getAssetDataType() == AssetDataType.ETF)
+                    .collect(Collectors.toList());
+        }
+        if (AssetDataType.INDEX == assetDataType) {
+            momentumAssetList = momentumAssetList.stream()
+                    .filter(stock -> stock.getAssetDataType() == AssetDataType.INDEX)
                     .collect(Collectors.toList());
         }
 
