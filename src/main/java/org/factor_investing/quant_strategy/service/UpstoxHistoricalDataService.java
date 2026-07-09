@@ -45,7 +45,13 @@ public class UpstoxHistoricalDataService {
             result = historyV3Api.getHistoricalCandleData1(instrumentKey, timeFrame, interval, toDate, fromDate);
 
         } catch (ApiException e) {
-           log.error("Exception when calling HistoryV3Api->getHistoricalCandleData1");
+            log.error(
+                    "Exception when calling HistoryV3Api->getHistoricalCandleData1. instrumentKey={}, statusCode={}, responseBody={}",
+                    instrumentKey,
+                    e.getCode(),
+                    e.getResponseBody(),
+                    e
+            );
         }
         return result;
     }

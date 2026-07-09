@@ -2,6 +2,8 @@ package org.factor_investing.quant_strategy.controller;
 
 import lombok.extern.slf4j.Slf4j;
 import org.factor_investing.quant_strategy.model.AssetDataType;
+import org.factor_investing.quant_strategy.model.PriceFrequencey;
+import org.factor_investing.quant_strategy.technical_analysis.SuperTrendResult;
 import org.factor_investing.quant_strategy.technical_analysis.TechnicalIndicatorService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -52,5 +54,33 @@ public class TechnicalIndicatorController {
         // Return JSON response (default)
         return ResponseEntity.ok(emaResults);
 
+    }
+
+    @GetMapping("SuperTrendIndicator/{days}")
+    public ResponseEntity<?> calculateSuperTrendIndicator(
+            @PathVariable(required = true) int days,
+            @RequestParam(defaultValue = "3.0") double multiplier,
+            @RequestParam(defaultValue = "DAILY") PriceFrequencey priceFrequencey,
+            @RequestParam(required = false) String download,
+            @RequestParam(required = true) AssetDataType assetDataType) {
+        Map<String, SuperTrendResult> superTrendResults = technicalIndicatorService.calculateLatestSuperTrend(days, multiplier, assetDataType, priceFrequencey);
+
+        if ("excel".equalsIgnoreCase(download)) {
+            byte[] excelData = technicalIndicatorService.generateSuperTrendExcel(superTrendResults, days, multiplier);
+
+            String timestamp = LocalDateTime.now()
+                    .format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmm"));
+            String filename = assetDataType + " " + priceFrequencey + " SuperTrend_" + days + "_" + multiplier + " " + timestamp + ".xlsx";
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType(
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+            headers.setContentDispositionFormData("attachment", filename);
+            headers.setContentLength(excelData.length);
+
+            return new ResponseEntity<>(excelData, headers, HttpStatus.OK);
+        }
+
+        return ResponseEntity.ok(superTrendResults);
     }
 }

@@ -10,6 +10,10 @@ import java.util.*;
 import java.util.HashSet;
 
 public class DateUtil {
+    private DateUtil() {
+        /* This utility class should not be instantiated */
+    }
+
     public static LocalDate getStartMonthDate(int year, int month) {
         LocalDate start = LocalDate.of(year, month, 1);
         while (start.getDayOfWeek() == DayOfWeek.SATURDAY || start.getDayOfWeek() == DayOfWeek.SUNDAY) {
