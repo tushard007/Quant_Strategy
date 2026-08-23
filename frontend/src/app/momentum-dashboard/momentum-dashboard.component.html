@@ -1,0 +1,48 @@
+<header>
+  <div><p class="eyebrow">MOMENTUM STRATEGY</p><h1>Momentum dashboard</h1><p class="subtitle">Monitor relative strength, leading assets and recent strategy runs.</p></div>
+  <div class="header-actions"><label><span>Asset type</span><select [ngModel]="assetType" (ngModelChange)="assetTypeChanged($event)"><option value="STOCK">Stocks</option><option value="ETF">ETFs</option><option value="INDEX">Indices</option></select></label><button class="outline-button" type="button" (click)="openAnalysis.emit()">Open full analysis <span>→</span></button></div>
+</header>
+
+@if (error()) {<div class="alert"><strong>!</strong><p>{{ error() }}</p><button type="button" aria-label="Dismiss error" (click)="error.set(null)">×</button></div>}
+
+@if (result()) {
+  <section class="metrics">
+    <article><span>{{ loadedFromHistory() ? 'Saved results' : 'Assets analyzed' }}</span><strong>{{ result()?.totalAnalyzed | number }}</strong><small>{{ assetLabel(assetType) }} · {{ asOfDate }}</small></article>
+    <article><span>Momentum qualified</span><strong>{{ result()?.qualifiedCount | number }}</strong><small>{{ result()?.totalAnalyzed ? ((result()!.qualifiedCount / result()!.totalAnalyzed) * 100 | number:'1.0-1') : 0 }}% of displayed universe</small></article>
+    <article><span>Median 12M return</span><strong [class.negative]="medianOneYear() < 0">{{ medianOneYear() | number:'1.2-2' }}%</strong><small>Across displayed assets</small></article>
+  </section>
+
+  <section class="dashboard-grid">
+    <article class="panel leaders-panel">
+      <div class="panel-heading"><div><h2>Top weighted momentum</h2><p>Lowest combined rank score leads.</p></div><span>{{ assetLabel(assetType) }}</span></div>
+      <div class="leader-list">
+        @for (asset of topFive(); track asset.stockName; let position = $index) {
+          <div class="leader-row"><b>{{ position + 1 }}</b><strong>{{ asset.stockName }}</strong><div class="mini-bars"><i class="bar one" [style.width.%]="barWidth(asset.oneYearReturn)"></i><i class="bar six" [style.width.%]="barWidth(asset.sixMonthReturn)"></i><i class="bar three" [style.width.%]="barWidth(asset.threeMonthReturn)"></i></div><span>{{ asset.totalRankScore | number:'1.0-0' }}</span></div>
+        }
+      </div>
+      <div class="legend"><span><i class="one"></i>12 month</span><span><i class="six"></i>6 month</span><span><i class="three"></i>3 month</span></div>
+    </article>
+    <article class="panel distribution-panel">
+      <div class="panel-heading"><div><h2>Positive return distribution</h2><p>Share of assets above zero.</p></div></div>
+      <div class="distribution"><div><strong>{{ positive12() | number:'1.0-0' }}%</strong><span>12 month</span><i><b [style.width.%]="positive12()"></b></i></div><div><strong>{{ positive6() | number:'1.0-0' }}%</strong><span>6 month</span><i><b [style.width.%]="positive6()"></b></i></div><div><strong>{{ positive3() | number:'1.0-0' }}%</strong><span>3 month</span><i><b [style.width.%]="positive3()"></b></i></div></div>
+    </article>
+  </section>
+
+  <section class="panel table-panel">
+    <div class="panel-heading"><div><h2>Leading assets</h2><p>Top ten assets ranked by weighted momentum.</p></div><button type="button" (click)="openAnalysis.emit()">View all results</button></div>
+    <div class="table-scroll"><table><thead><tr><th>Position</th><th>Asset</th><th>12M return</th><th>6M return</th><th>3M return</th><th>Total rank</th></tr></thead><tbody>@for (asset of leaders(); track asset.stockName; let position = $index) {<tr><td><span class="rank">{{ position + 1 }}</span></td><td><strong>{{ asset.stockName }}</strong></td><td [class.negative]="asset.oneYearReturn < 0">{{ asset.oneYearReturn | number:'1.2-2' }}%</td><td [class.negative]="asset.sixMonthReturn < 0">{{ asset.sixMonthReturn | number:'1.2-2' }}%</td><td [class.negative]="asset.threeMonthReturn < 0">{{ asset.threeMonthReturn | number:'1.2-2' }}%</td><td><b>{{ asset.totalRankScore | number:'1.0-0' }}</b></td></tr>}</tbody></table></div>
+  </section>
+} @else if (loading()) {
+  <section class="empty-state"><i class="large-spinner"></i><h2>Calculating momentum</h2><p>Reading historical prices and ranking {{ assetLabel(assetType).toLowerCase() }}.</p></section>
+} @else {
+  <section class="empty-state"><span>↗</span><h2>No saved momentum result</h2><p>Choose another asset type or open full analysis to create the first execution.</p></section>
+}
+
+<section class="panel history-panel">
+  <div class="panel-heading"><div><h2>Recent executions</h2><p>Open a saved momentum result without recalculating it.</p></div>@if (historyLoading()) {<small>Loading…</small>}</div>
+  @if (executions().length) {<div class="execution-groups">
+    <section><h3>Stocks</h3><div class="execution-list">@for (execution of stockExecutions().slice(0, 3); track execution.strategyRunDate) {<article><div><strong>Stocks · {{ execution.strategyRunDate | date:'d MMM y':'UTC' }}</strong><small>{{ execution.resultCount }} qualified · {{ execution.analyzedCount }} analyzed</small></div><button type="button" (click)="loadExecution(execution)">Load</button></article>} @empty {<p>No stock executions</p>}</div></section>
+    <section><h3>ETFs</h3><div class="execution-list">@for (execution of etfExecutions().slice(0, 3); track execution.strategyRunDate) {<article><div><strong>ETFs · {{ execution.strategyRunDate | date:'d MMM y':'UTC' }}</strong><small>{{ execution.resultCount }} qualified · {{ execution.analyzedCount }} analyzed</small></div><button type="button" (click)="loadExecution(execution)">Load</button></article>} @empty {<p>No ETF executions</p>}</div></section>
+    <section><h3>Indices</h3><div class="execution-list">@for (execution of indexExecutions().slice(0, 3); track execution.strategyRunDate) {<article><div><strong>Indices · {{ execution.strategyRunDate | date:'d MMM y':'UTC' }}</strong><small>{{ execution.resultCount }} qualified · {{ execution.analyzedCount }} analyzed</small></div><button type="button" (click)="loadExecution(execution)">Load</button></article>} @empty {<p>No index executions</p>}</div></section>
+  </div>} @else if (!historyLoading()) {<p class="no-history">No saved momentum executions are available yet.</p>}
+</section>

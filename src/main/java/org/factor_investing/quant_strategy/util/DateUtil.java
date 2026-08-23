@@ -78,6 +78,20 @@ public class DateUtil {
         return nearestDate;
     }
 
+    /**
+     * Returns the latest available date that is equal to or before the requested date.
+     * This prevents historical calculations from using future price data.
+     */
+    public static LocalDate findNearestPastDate(Set<LocalDate> dateSet, LocalDate inputDate) {
+        if (dateSet == null || dateSet.isEmpty() || inputDate == null) {
+            return null;
+        }
+        return dateSet.stream()
+                .filter(date -> !date.isAfter(inputDate))
+                .max(LocalDate::compareTo)
+                .orElse(null);
+    }
+
     public static Set<LocalDate> convertToLocalDateSet(Set<Date> dateSet) {
         Set<LocalDate> localDateSet = new HashSet<>();
         for (Date date : dateSet) {

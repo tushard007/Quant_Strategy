@@ -1,0 +1,22 @@
+services:
+  quant-strategy:
+    build: .
+    image: quant-strategy:1.0.2
+    restart: unless-stopped
+    ports:
+      - "8082:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:postgresql://host.docker.internal:${POSTGRES_PORT:-5432}/${POSTGRES_DATABASE:-factor_investing}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-tushardesarda}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-}
+      LOGGING_FILE_NAME: /app/logs/Quant_Strategy.log
+      ICA_API_KEY: ${ICA_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    volumes:
+      - application-logs:/app/logs
+
+volumes:
+  application-logs:

@@ -11,4 +11,5 @@ import java.util.List;
 @Repository
 public interface TopMomentumStockRepository extends JpaRepository<TopN_MomentumAssetType, Integer> {
     List<TopN_MomentumAssetType> findByAssetDataTypeAndStrategyRunDateOrderByRank12MonthsAsc(AssetDataType assetDataType, Date strategyRunDate);
+    void deleteByAssetDataTypeAndStrategyRunDate(AssetDataType assetDataType, Date strategyRunDate);
 }

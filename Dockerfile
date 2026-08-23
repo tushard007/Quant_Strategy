@@ -1,26 +1,33 @@
-# -------------------------
-# Build Stage
-# -------------------------
-FROM maven:3.9.9-eclipse-temurin-17 AS builder
+FROM maven:3.9.9-eclipse-temurin-21 AS builder
 
-WORKDIR /app
+WORKDIR /workspace
 
-COPY pom.xml .
-RUN mvn dependency:go-offline -B
-
+COPY pom.xml ./
+COPY frontend ./frontend
 COPY src ./src
-RUN mvn clean package -DskipTests
 
-# -------------------------
-# Runtime Stage
-# -------------------------
-FROM eclipse-temurin:17-jre
+RUN mvn package -DskipTests -B
+
+FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
-COPY --from=builder /app/target/Quant_Strategy-1.0.1.jar app.jar
+RUN useradd --system --create-home quantapp \
+    && mkdir -p /app/logs \
+    && chown -R quantapp:quantapp /app
 
-EXPOSE 8091
+COPY --from=builder \
+    --chown=quantapp:quantapp \
+    /workspace/target/Quant_Strategy-1.0.2.jar \
+    /app/app.jar
 
-# Enable Java Preview Features
-ENTRYPOINT ["java", "--enable-preview", "-jar", "app.jar"]
+USER quantapp
+
+EXPOSE 8080
+
+ENV SPRING_PROFILES_ACTIVE=dev \
+    SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/factor_investing \
+    SPRING_DATASOURCE_USERNAME=tushardesarda \
+    LOGGING_FILE_NAME=/app/logs/Quant_Strategy.log
+
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

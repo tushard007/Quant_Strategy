@@ -7,19 +7,23 @@ import { StockMasterComponent } from './stock-master/stock-master.component';
 import { ETFMasterComponent } from './etf-master/etf-master.component';
 import { IndexMasterComponent } from './index-master/index-master.component';
 import { MomentumAnalysisComponent } from './momentum-analysis/momentum-analysis.component';
+import { MomentumDashboardComponent } from './momentum-dashboard/momentum-dashboard.component';
+import { OhlcvExperimentComponent } from './ohlcv-experiment/ohlcv-experiment.component';
 import { TechnicalIndicatorComponent } from './technical-indicator/technical-indicator.component';
 type TimeFrame = 'DAILY' | 'WEEKLY';
 type SourceKey = 'stock' | 'etf' | 'index';
+type AppTheme = 'forest' | 'ocean' | 'slate' | 'contrast';
 interface PriceSource { key: SourceKey; title: string; shortTitle: string; description: string; path: string; icon: string; }
 interface HistoryItem { id: number; sourceKey: SourceKey; title: string; timeFrame: TimeFrame; success: boolean; message: string; completedAt: Date; }
-@Component({ selector: 'app-root', imports: [FormsModule, DatePipe, StockMasterComponent, ETFMasterComponent, IndexMasterComponent, MomentumAnalysisComponent, TechnicalIndicatorComponent], templateUrl: './app.html', styleUrl: './app.scss' })
+@Component({ selector: 'app-root', imports: [FormsModule, DatePipe, StockMasterComponent, ETFMasterComponent, IndexMasterComponent, MomentumAnalysisComponent, MomentumDashboardComponent, OhlcvExperimentComponent, TechnicalIndicatorComponent], templateUrl: './app.html', styleUrl: './app.scss' })
 export class App {
   private readonly http = inject(HttpClient);
   readonly timeFrame = signal<TimeFrame>('DAILY');
   readonly loading = signal<Record<SourceKey, boolean>>({ stock: false, etf: false, index: false });
   readonly history = signal<HistoryItem[]>([]);
   readonly notice = signal<{ type: 'success' | 'error'; message: string } | null>(null);
-  readonly activePage = signal<'price' | 'stocks' | 'etfs' | 'indexes' | 'momentum' | 'technical-indicator'>('price');
+  readonly activePage = signal<'dashboard' | 'price' | 'stocks' | 'etfs' | 'indexes' | 'momentum' | 'experiment' | 'technical-indicator'>('dashboard');
+  readonly theme = signal<AppTheme>(this.savedTheme());
   readonly isAnyLoading = computed(() => Object.values(this.loading()).some(Boolean));
   readonly sources: PriceSource[] = [
     { key: 'stock', title: 'Stock Prices', shortTitle: 'stocks', description: 'Refresh historical OHLCV data for all stocks in the master list.', path: 'stock-Price', icon: '▥' },
@@ -33,10 +37,12 @@ export class App {
   syncAll(): void { this.sources.forEach(source => this.sync(source)); }
   retry(item: HistoryItem): void { const source = this.sources.find(value => value.key === item.sourceKey); if (source) this.sync(source, item.timeFrame); }
   clearHistory(): void { this.history.set([]); }
+  setTheme(theme: AppTheme): void { this.theme.set(theme); localStorage.setItem('quant-theme', theme); }
   private record(source: PriceSource, timeFrame: TimeFrame, success: boolean, message: string): void {
     const cleanMessage = typeof message === 'string' ? message : JSON.stringify(message);
     this.history.update(items => [{ id: Date.now() + Math.random(), sourceKey: source.key, title: source.title, timeFrame, success, message: cleanMessage, completedAt: new Date() }, ...items]);
     const frequency = timeFrame === 'DAILY' ? 'daily' : 'weekly';
     this.notice.set({ type: success ? 'success' : 'error', message: success ? `Success! ${source.title} have been updated with the latest ${frequency} price data.` : `We couldn't update ${source.title}. ${cleanMessage}` });
   }
+  private savedTheme(): AppTheme { const value = localStorage.getItem('quant-theme'); return value === 'ocean' || value === 'slate' || value === 'contrast' ? value : 'forest'; }
 }

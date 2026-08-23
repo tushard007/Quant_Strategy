@@ -6,6 +6,7 @@ import org.factor_investing.quant_strategy.strategies.momentum.StockMomentumServ
 import org.factor_investing.quant_strategy.model.response.MomentumExecutionSummary;
 import org.factor_investing.quant_strategy.model.response.SavedMomentumResult;
 import org.springframework.http.ResponseEntity;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.sql.Date;
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -32,9 +34,11 @@ public class MomentumController {
      */
     @PostMapping("/calculate-and-rank/{assetDataType}")
     public ResponseEntity<MomentumResult> calculateAndRank(
-            @PathVariable AssetDataType assetDataType
+            @PathVariable AssetDataType assetDataType,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOfDate
     ) {
-        MomentumResult result = momentumService.calculateAndRankMomentum(assetDataType);
+        MomentumResult result = momentumService.calculateAndRankMomentum(assetDataType, asOfDate);
         return result.isValid()
                 ? ResponseEntity.ok(result)
                 : ResponseEntity.badRequest().body(result);
