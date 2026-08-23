@@ -9,5 +9,9 @@ import java.util.Optional;
 @Repository
 public interface NSEIndexMasterDataRepository extends JpaRepository<NSEIndexMasterData, Long> {
 
-    Optional<NSEIndexMasterData> findBySymbol(String symbol);
+    Optional<NSEIndexMasterData> findBySymbolIgnoreCase(String symbol);
+    boolean existsBySymbolIgnoreCase(String symbol);
+    boolean existsBySymbolIgnoreCaseAndIdNot(String symbol, Long id);
+    boolean existsByInstrumentKeyIgnoreCase(String instrumentKey);
+    boolean existsByInstrumentKeyIgnoreCaseAndIdNot(String instrumentKey, Long id);
 }

@@ -10,7 +10,7 @@ import java.sql.Date;
 
 @Entity
 @Table(name = "t_top_momentum_stock",uniqueConstraints = {
-@UniqueConstraint(columnNames = {"stockName", "StrategyRunDate"})
+@UniqueConstraint(columnNames = {"stock_name", "strategy_run_date"})
 })
 @Getter
 @Setter
@@ -22,11 +22,12 @@ public class TopN_MomentumAssetType {
     public float percentageReturn12Months;
     public float percentageReturn6Months;
     public float percentageReturn3Months;
-    public Date StrategyRunDate;
-    public int Rank12Months;
-    public int Rank6Months;
-    public int Rank3Months;
-    public int TotalRankScore;
+    @Column(name = "strategy_run_date")
+    public Date strategyRunDate;
+    public int rank12Months;
+    public int rank6Months;
+    public int rank3Months;
+    public int totalRankScore;
     @Enumerated(EnumType.STRING)
     public AssetDataType assetDataType;
     @CreationTimestamp

@@ -3,6 +3,8 @@ package org.factor_investing.quant_strategy.strategies.momentum;
 import lombok.extern.slf4j.Slf4j;
 import org.factor_investing.quant_strategy.model.AssetDataType;
 import org.factor_investing.quant_strategy.model.TopN_MomentumAssetType;
+import org.factor_investing.quant_strategy.model.response.MomentumExecutionSummary;
+import org.factor_investing.quant_strategy.model.response.SavedMomentumResult;
 import org.factor_investing.quant_strategy.repository.TopMomentumStockRepository;
 import org.factor_investing.quant_strategy.service.StockPriceCacheService;
 import org.factor_investing.quant_strategy.strategies.OHLCV;
@@ -10,6 +12,7 @@ import org.factor_investing.quant_strategy.util.DateUtil;
 import org.factor_investing.quant_strategy.util.ReturnCalculationUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.*;
@@ -27,6 +30,48 @@ public class StockMomentumService {
     private StockPriceCacheService stockPriceCacheService;
     @Autowired
     private TopMomentumStockRepository topMomentumStockRepository;
+
+    public List<MomentumExecutionSummary> getExecutionHistory(AssetDataType assetDataType) {
+        return topMomentumStockRepository.findAll().stream()
+                .filter(item -> assetDataType == null || item.getAssetDataType() == assetDataType)
+                .collect(Collectors.groupingBy(item -> Map.entry(item.getAssetDataType(), item.getStrategyRunDate())))
+                .entrySet().stream()
+                .map(entry -> new MomentumExecutionSummary(
+                        entry.getKey().getKey(), entry.getKey().getValue(), entry.getValue().size(),
+                        entry.getValue().stream().map(TopN_MomentumAssetType::getModificationDate)
+                                .filter(Objects::nonNull).max(Date::compareTo).map(Date::toInstant).orElse(null)))
+                .sorted(Comparator.comparing(MomentumExecutionSummary::strategyRunDate).reversed())
+                .toList();
+    }
+
+    public List<SavedMomentumResult> getSavedResults(AssetDataType assetDataType, java.sql.Date strategyRunDate) {
+        return topMomentumStockRepository.findByAssetDataTypeAndStrategyRunDateOrderByRank12MonthsAsc(assetDataType, strategyRunDate)
+                .stream().map(item -> new SavedMomentumResult(item.getStockName(), item.getPercentageReturn12Months(),
+                        item.getPercentageReturn6Months(), item.getPercentageReturn3Months(), item.getStrategyRunDate(),
+                        item.getRank12Months(), item.getRank6Months(), item.getRank3Months(), item.getTotalRankScore()))
+                .toList();
+    }
+
+    /**
+     * Runs the complete momentum workflow in the required order.
+     * Rankings are never assigned when the initial calculation fails.
+     */
+    @Transactional
+    public MomentumResult calculateAndRankMomentum(AssetDataType assetDataType) {
+        MomentumResult calculation = calculateMomentum(assetDataType);
+        if (!calculation.isValid()) {
+            return calculation;
+        }
+
+        assignRanks(assetDataType);
+        return new MomentumResult(
+                calculation.getAllStocks(),
+                calculation.getQualifiedStocks(),
+                calculation.getTopStockNames(),
+                true,
+                "Momentum calculation and ranking completed successfully"
+        );
+    }
 
     /**
      * Calculate momentum for all stocks in the provided data
