@@ -17,7 +17,7 @@ class OhlcvExperimentServiceTest {
     @Test
     void computesFeaturesAndUsesCompetitionRanksForTies() {
         List<OHLCV> identical = bars(100, 1);
-        OhlcvExperimentService service = new OhlcvExperimentService(null);
+        OhlcvExperimentService service = new OhlcvExperimentService(null, null, null);
 
         OhlcvExperimentResult result = service.run(AssetDataType.ETF, Map.of("AAA", identical, "BBB", bars(100, 1)), LocalDate.of(2026, 8, 23));
 
@@ -33,7 +33,7 @@ class OhlcvExperimentServiceTest {
 
     @Test
     void skipsTickersWithout253Bars() {
-        OhlcvExperimentResult result = new OhlcvExperimentService(null).run(AssetDataType.ETF, Map.of("SHORT", bars(100, 0).subList(0, 252)), LocalDate.of(2026, 8, 23));
+        OhlcvExperimentResult result = new OhlcvExperimentService(null, null, null).run(AssetDataType.ETF, Map.of("SHORT", bars(100, 0).subList(0, 252)), LocalDate.of(2026, 8, 23));
 
         assertThat(result.scoredCount()).isZero();
         assertThat(result.skippedCount()).isEqualTo(1);

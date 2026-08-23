@@ -1,7 +1,10 @@
 package org.factor_investing.quant_strategy.strategies.experiment;
 
 import org.factor_investing.quant_strategy.model.AssetDataType;
+import org.factor_investing.quant_strategy.model.NSEStockMasterData;
 import org.factor_investing.quant_strategy.model.response.OhlcvExperimentResult;
+import org.factor_investing.quant_strategy.repository.NSEStockMasterDataRepository;
+import org.factor_investing.quant_strategy.repository.NSE_ETFMasterDataRepository;
 import org.factor_investing.quant_strategy.service.StockPriceCacheService;
 import org.factor_investing.quant_strategy.strategies.OHLCV;
 import org.factor_investing.quant_strategy.util.DateUtil;
@@ -10,13 +13,19 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.function.ToDoubleFunction;
+import java.util.stream.Collectors;
 
 @Service
 public class OhlcvExperimentService {
     private final StockPriceCacheService cacheService;
+    private final NSEStockMasterDataRepository stockMasterRepository;
+    private final NSE_ETFMasterDataRepository etfMasterRepository;
 
-    public OhlcvExperimentService(StockPriceCacheService cacheService) {
+    public OhlcvExperimentService(StockPriceCacheService cacheService, NSEStockMasterDataRepository stockMasterRepository,
+                                  NSE_ETFMasterDataRepository etfMasterRepository) {
         this.cacheService = cacheService;
+        this.stockMasterRepository = stockMasterRepository;
+        this.etfMasterRepository = etfMasterRepository;
     }
 
     public OhlcvExperimentResult runCached(AssetDataType type, LocalDate asOfDate) {
@@ -25,8 +34,9 @@ public class OhlcvExperimentService {
 
     public OhlcvExperimentResult run(AssetDataType type, Map<String, List<OHLCV>> universe, LocalDate requestedDate) {
         if (requestedDate != null && requestedDate.isAfter(LocalDate.now())) throw new IllegalArgumentException("As-of date cannot be in the future");
+        Map<String, String> descriptions = descriptions(type);
         List<MutableRow> rows = universe.entrySet().stream()
-                .map(entry -> features(entry.getKey(), "OHLCV", entry.getValue(), requestedDate))
+                .map(entry -> features(entry.getKey(), descriptions.getOrDefault(entry.getKey().toUpperCase(), "OHLCV"), entry.getValue(), requestedDate))
                 .filter(Objects::nonNull).toList();
         rank(rows, value -> value.ret12, (value, rank) -> value.rank12 = rank);
         rank(rows, value -> value.ret6, (value, rank) -> value.rank6 = rank);
@@ -86,6 +96,23 @@ public class OhlcvExperimentService {
     }
 
     private Map<String, List<OHLCV>> prices(AssetDataType type) { return switch (type) { case STOCK -> cacheService.getCachedAllStockPriceData(); case ETF -> cacheService.getCachedAllETFPriceData(); case INDEX -> cacheService.getCachedAllIndexPriceData(); }; }
+    private Map<String, String> descriptions(AssetDataType type) {
+        if (type == AssetDataType.STOCK && stockMasterRepository != null) {
+            return stockMasterRepository.findAll().stream().filter(item -> item.getSymbol() != null)
+                    .collect(Collectors.toMap(item -> item.getSymbol().toUpperCase(), this::stockDescription, (first, ignored) -> first));
+        }
+        if (type == AssetDataType.ETF && etfMasterRepository != null) {
+            return etfMasterRepository.findAll().stream().filter(item -> item.getSymbol() != null)
+                    .collect(Collectors.toMap(item -> item.getSymbol().toUpperCase(), item -> text(item.getUnderlying(), "Underlying unavailable"), (first, ignored) -> first));
+        }
+        return Map.of();
+    }
+    private String stockDescription(NSEStockMasterData item) {
+        String company = text(item.getNameOfCompany(), item.getSymbol());
+        String industry = text(item.getIndustry(), "Industry unavailable");
+        return company + " · " + industry;
+    }
+    private String text(String value, String fallback) { return value == null || value.isBlank() ? fallback : value.trim(); }
     private double ratio(double current, double previous) { return previous <= 0 ? Double.NaN : current / previous - 1; }
     private double averageClose(List<OHLCV> bars, int start, int end) { return bars.subList(start, end + 1).stream().mapToDouble(OHLCV::getClose).average().orElse(Double.NaN); }
     private double averageVolume(List<OHLCV> bars, int start, int end) { return bars.subList(start, end + 1).stream().mapToLong(OHLCV::getVolume).average().orElse(Double.NaN); }
