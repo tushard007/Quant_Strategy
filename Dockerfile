@@ -3,10 +3,25 @@ FROM maven:3.9.9-eclipse-temurin-21 AS builder
 WORKDIR /workspace
 
 COPY pom.xml ./
+
+# Docker Desktop can occasionally reset long TLS downloads from Maven Central.
+# Cache artifacts between builds and retry transient HTTP/TLS failures.
+ENV MAVEN_OPTS="-Djava.net.preferIPv4Stack=true"
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn dependency:go-offline -B -ntp \
+      -Dmaven.wagon.http.retryHandler.count=5 \
+      -Dmaven.wagon.httpconnectionManager.ttlSeconds=120 \
+    || mvn dependency:go-offline -B -ntp \
+      -Dmaven.wagon.http.retryHandler.count=5 \
+      -Dmaven.wagon.httpconnectionManager.ttlSeconds=120
+
 COPY frontend ./frontend
 COPY src ./src
 
-RUN mvn package -DskipTests -B
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn package -DskipTests -B -ntp \
+      -Dmaven.wagon.http.retryHandler.count=5 \
+      -Dmaven.wagon.httpconnectionManager.ttlSeconds=120
 
 FROM eclipse-temurin:21-jre
 
