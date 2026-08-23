@@ -1,0 +1,19 @@
+@use '../stock-master/stock-master.component.scss';
+
+table { table-layout: fixed; min-width: 850px; }
+th:nth-child(1), td:nth-child(1) { width: 13%; }
+th:nth-child(2), td:nth-child(2) { width: 25%; }
+th:nth-child(3), td:nth-child(3) { width: 23%; }
+th:nth-child(4), td:nth-child(4) { width: 13%; white-space: nowrap; }
+th:nth-child(5), td:nth-child(5) { width: 15%; }
+th:nth-child(6), td:nth-child(6) { width: 11%; }
+td { overflow: hidden; text-overflow: ellipsis; }
+td:nth-child(2), td:nth-child(3) { white-space: normal; line-height: 1.35; }
+td code { font-size: 11px; white-space: nowrap; }
+.actions { gap: 5px; }
+.actions button { padding: 5px 7px; font-size: 11px; }
+
+@media (max-width: 1100px) {
+  table { min-width: 780px; }
+  th, td { padding-left: 11px; padding-right: 11px; }
+}

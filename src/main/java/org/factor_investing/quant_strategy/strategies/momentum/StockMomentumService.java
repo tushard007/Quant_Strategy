@@ -3,6 +3,8 @@ package org.factor_investing.quant_strategy.strategies.momentum;
 import lombok.extern.slf4j.Slf4j;
 import org.factor_investing.quant_strategy.model.AssetDataType;
 import org.factor_investing.quant_strategy.model.TopN_MomentumAssetType;
+import org.factor_investing.quant_strategy.model.response.MomentumExecutionSummary;
+import org.factor_investing.quant_strategy.model.response.SavedMomentumResult;
 import org.factor_investing.quant_strategy.repository.TopMomentumStockRepository;
 import org.factor_investing.quant_strategy.service.StockPriceCacheService;
 import org.factor_investing.quant_strategy.strategies.OHLCV;
@@ -10,8 +12,10 @@ import org.factor_investing.quant_strategy.util.DateUtil;
 import org.factor_investing.quant_strategy.util.ReturnCalculationUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
@@ -23,18 +27,77 @@ import static org.factor_investing.quant_strategy.util.DateUtil.convertToLocalDa
 @Slf4j
 public class StockMomentumService {
 
+    private static final ZoneId MARKET_TIME_ZONE = ZoneId.of("Asia/Kolkata");
+
     @Autowired
     private StockPriceCacheService stockPriceCacheService;
     @Autowired
     private TopMomentumStockRepository topMomentumStockRepository;
+
+    public List<MomentumExecutionSummary> getExecutionHistory(AssetDataType assetDataType) {
+        Map<AssetDataType, Long> analyzedCounts = currentUniverseCounts();
+        return topMomentumStockRepository.findAll().stream()
+                .filter(item -> assetDataType == null || item.getAssetDataType() == assetDataType)
+                .collect(Collectors.groupingBy(item -> Map.entry(item.getAssetDataType(), item.getStrategyRunDate())))
+                .entrySet().stream()
+                .map(entry -> new MomentumExecutionSummary(
+                        entry.getKey().getKey(), entry.getKey().getValue(), entry.getValue().size(),
+                        analyzedCounts.getOrDefault(entry.getKey().getKey(), 0L),
+                        entry.getValue().stream().map(TopN_MomentumAssetType::getModificationDate)
+                                .filter(Objects::nonNull).max(Date::compareTo).map(Date::toInstant).orElse(null)))
+                .sorted(Comparator.comparing(MomentumExecutionSummary::strategyRunDate).reversed())
+                .toList();
+    }
+
+    private Map<AssetDataType, Long> currentUniverseCounts() {
+        Map<AssetDataType, Long> counts = new EnumMap<>(AssetDataType.class);
+        counts.put(AssetDataType.STOCK, (long) stockPriceCacheService.getCachedAllStockPriceData().size());
+        counts.put(AssetDataType.ETF, (long) stockPriceCacheService.getCachedAllETFPriceData().size());
+        counts.put(AssetDataType.INDEX, (long) stockPriceCacheService.getCachedAllIndexPriceData().size());
+        return counts;
+    }
+
+    public List<SavedMomentumResult> getSavedResults(AssetDataType assetDataType, java.sql.Date strategyRunDate) {
+        return topMomentumStockRepository.findByAssetDataTypeAndStrategyRunDateOrderByRank12MonthsAsc(assetDataType, strategyRunDate)
+                .stream().map(item -> new SavedMomentumResult(item.getStockName(), item.getPercentageReturn12Months(),
+                        item.getPercentageReturn6Months(), item.getPercentageReturn3Months(), item.getStrategyRunDate(),
+                        item.getRank12Months(), item.getRank6Months(), item.getRank3Months(), item.getTotalRankScore()))
+                .toList();
+    }
+
+    /**
+     * Runs the complete momentum workflow in the required order.
+     * Rankings are never assigned when the initial calculation fails.
+     */
+    @Transactional
+    public MomentumResult calculateAndRankMomentum(AssetDataType assetDataType, LocalDate asOfDate) {
+        LocalDate calculationDate = asOfDate == null ? LocalDate.now(MARKET_TIME_ZONE) : asOfDate;
+        MomentumResult calculation = calculateMomentum(assetDataType, calculationDate);
+        if (!calculation.isValid()) {
+            return calculation;
+        }
+
+        assignRanks(assetDataType, calculationDate);
+        return new MomentumResult(
+                calculation.getAllStocks(),
+                calculation.getQualifiedStocks(),
+                calculation.getTopStockNames(),
+                true,
+                "Momentum calculation and ranking completed successfully"
+        );
+    }
 
     /**
      * Calculate momentum for all stocks in the provided data
      *
      * @return MomentumResult containing all calculation results
      */
-    public MomentumResult calculateMomentum(AssetDataType assetDataType) {
+    public MomentumResult calculateMomentum(AssetDataType assetDataType, LocalDate asOfDate) {
         try {
+            if (asOfDate.isAfter(LocalDate.now(MARKET_TIME_ZONE))) {
+                throw new IllegalArgumentException("As-of date cannot be in the future");
+            }
+            log.info("Calculating {} momentum as of {}", assetDataType, asOfDate);
             Map<String, List<OHLCV>> stockData = null;
             if (AssetDataType.STOCK == assetDataType) {
                 stockData = stockPriceCacheService.getCachedAllStockPriceData();
@@ -56,7 +119,7 @@ public class StockMomentumService {
                 List<OHLCV> ohlcData = entry.getValue();
                 count++;
                 try {
-                    StockMomentum momentum = calculateStockMomentum(stockName, ohlcData,assetDataType);
+                    StockMomentum momentum = calculateStockMomentum(stockName, ohlcData, assetDataType, asOfDate);
                     if (momentum != null) {
                         allResults.add(momentum);
                         if (momentum.isQualifiesForMomentum()) {
@@ -77,8 +140,18 @@ public class StockMomentumService {
                 }
                 log.info("Calculation in progress remaining stock to process: {}", stockData.size() - count);
             }
-            if (!topN_momentumStocksList.isEmpty())
+            if (allResults.isEmpty()) {
+                return new MomentumResult(Collections.emptyList(), Collections.emptyList(),
+                        Collections.emptyList(), false,
+                        "No assets have complete 12-month, 6-month and 3-month price history on or before "
+                                + asOfDate + ". Select a later date or load older price data.");
+            }
+            java.sql.Date strategyRunDate = java.sql.Date.valueOf(asOfDate);
+            topMomentumStockRepository.deleteByAssetDataTypeAndStrategyRunDate(assetDataType, strategyRunDate);
+            topMomentumStockRepository.flush();
+            if (!topN_momentumStocksList.isEmpty()) {
                 topMomentumStockRepository.saveAll(topN_momentumStocksList);
+            }
             // Sort by 1-year return (descending)
             List<StockMomentum> sortedResults = allResults.stream()
                     .sorted(Comparator.comparingDouble(StockMomentum::getOneYearReturn).reversed())
@@ -108,7 +181,8 @@ public class StockMomentumService {
     /**
      * Calculate momentum for a single stock
      */
-    private StockMomentum calculateStockMomentum(String stockName, List<OHLCV> ohlcData,AssetDataType assetDataType) {
+    private StockMomentum calculateStockMomentum(String stockName, List<OHLCV> ohlcData,
+                                                  AssetDataType assetDataType, LocalDate asOfDate) {
         if (ohlcData == null || ohlcData.isEmpty()) {
             return null;
         }
@@ -117,21 +191,17 @@ public class StockMomentumService {
             Set<Date> allUniqueStockPrice = stockPriceCacheService.getAllAssetWisePriceDateBySymbol(stockName,assetDataType);
             Set<LocalDate> allUniqueStockPriceLocaleDates = convertToLocalDateSet(allUniqueStockPrice);
 
-            LocalDate currentDate = LocalDate.now();
-            if (!allUniqueStockPriceLocaleDates.contains(currentDate)) {
-                currentDate = DateUtil.findNearestDate(allUniqueStockPriceLocaleDates, currentDate);
-            }
-            LocalDate previous1YearDate = DateUtil.getDateBeforeYear(currentDate, 1);
-            if (!allUniqueStockPriceLocaleDates.contains(previous1YearDate)) {
-                previous1YearDate = DateUtil.findNearestDate(allUniqueStockPriceLocaleDates, previous1YearDate);
-            }
-            LocalDate previous6MonthDate = DateUtil.getDateBeforeMonth(currentDate, 6);
-            if (!allUniqueStockPriceLocaleDates.contains(previous6MonthDate)) {
-                previous6MonthDate = DateUtil.findNearestDate(allUniqueStockPriceLocaleDates, previous6MonthDate);
-            }
-            LocalDate previous3MonthDate = DateUtil.getDateBeforeMonth(currentDate, 3);
-            if (!allUniqueStockPriceLocaleDates.contains(previous3MonthDate)) {
-                previous3MonthDate = DateUtil.findNearestDate(allUniqueStockPriceLocaleDates, previous3MonthDate);
+            LocalDate currentDate = DateUtil.findNearestPastDate(allUniqueStockPriceLocaleDates, asOfDate);
+            LocalDate previous1YearDate = DateUtil.findNearestPastDate(
+                    allUniqueStockPriceLocaleDates, DateUtil.getDateBeforeYear(asOfDate, 1));
+            LocalDate previous6MonthDate = DateUtil.findNearestPastDate(
+                    allUniqueStockPriceLocaleDates, DateUtil.getDateBeforeMonth(asOfDate, 6));
+            LocalDate previous3MonthDate = DateUtil.findNearestPastDate(
+                    allUniqueStockPriceLocaleDates, DateUtil.getDateBeforeMonth(asOfDate, 3));
+
+            if (currentDate == null || previous1YearDate == null
+                    || previous6MonthDate == null || previous3MonthDate == null) {
+                return null;
             }
             // Fetch prices for the required dates
             Double currentPrice = getMostRecentPrice(stockName, currentDate,assetDataType);
@@ -149,12 +219,9 @@ public class StockMomentumService {
             Float oneYearReturn = ReturnCalculationUtils.percentReturn(previous1YearPrice.floatValue(), currentPrice.floatValue());
             Float sixMonthReturn = ReturnCalculationUtils.percentReturn(previous6MonthPrice.floatValue(), currentPrice.floatValue());
             Float threeMonthReturn = ReturnCalculationUtils.percentReturn(previous3MonthPrice.floatValue(), currentPrice.floatValue());
-            if (oneYearReturn > 0 && sixMonthReturn > 0 && threeMonthReturn > 0) {
-                log.info("oneYearReturn:{}, sixMonthReturn:{}, threeMonthReturn:{}\n====================", oneYearReturn, sixMonthReturn, threeMonthReturn);
-                return new StockMomentum(stockName, oneYearReturn, sixMonthReturn, threeMonthReturn, currentDate);
-            } else {
-                return null;
-            }
+            log.info("oneYearReturn:{}, sixMonthReturn:{}, threeMonthReturn:{}\n====================",
+                    oneYearReturn, sixMonthReturn, threeMonthReturn);
+            return new StockMomentum(stockName, oneYearReturn, sixMonthReturn, threeMonthReturn, asOfDate);
         } else {
             log.error(
                     "Insufficient data points for {}. Required: {}, Provided: {}",
@@ -218,23 +285,10 @@ public class StockMomentumService {
                 .forEach(i -> rankSetter.accept(sorted.get(i), i + 1));
     }
     
-    public void assignRanks(AssetDataType assetDataType) {
-        List<TopN_MomentumAssetType> momentumAssetList = topMomentumStockRepository.findAll();
-        if (AssetDataType.STOCK == assetDataType) {
-            momentumAssetList = momentumAssetList.stream()
-                    .filter(stock -> stock.getAssetDataType() == AssetDataType.STOCK)
-                    .collect(Collectors.toList());
-        }
-        if (AssetDataType.ETF == assetDataType) {
-            momentumAssetList = momentumAssetList.stream()
-                    .filter(stock -> stock.getAssetDataType() == AssetDataType.ETF)
-                    .collect(Collectors.toList());
-        }
-        if (AssetDataType.INDEX == assetDataType) {
-            momentumAssetList = momentumAssetList.stream()
-                    .filter(stock -> stock.getAssetDataType() == AssetDataType.INDEX)
-                    .collect(Collectors.toList());
-        }
+    public void assignRanks(AssetDataType assetDataType, LocalDate asOfDate) {
+        List<TopN_MomentumAssetType> momentumAssetList =
+                topMomentumStockRepository.findByAssetDataTypeAndStrategyRunDateOrderByRank12MonthsAsc(
+                        assetDataType, java.sql.Date.valueOf(asOfDate));
 
         // Rank by 12 months return (1 = highest return)
         rankMomentumAsset(momentumAssetList,
@@ -267,6 +321,7 @@ public class StockMomentumService {
         topMomentumStockRepository.saveAll(momentumAssetList);
         log.info("Momentum rankings updated successfully (weighted: 3m>6m>12m).");
     }
+
     private void validateInput(Map<String, List<OHLCV>> stockData) {
         if (stockData == null || stockData.isEmpty()) {
             throw new IllegalArgumentException("Stock data cannot be null or empty");

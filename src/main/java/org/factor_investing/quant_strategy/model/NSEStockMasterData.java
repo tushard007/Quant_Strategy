@@ -18,6 +18,8 @@ public class NSEStockMasterData {
     private String nameOfCompany;
     private String series;
     private String isinNumber;
+    @Column(name = "industry", length = 150)
+    private String industry;
 
 
 }

@@ -1,0 +1,37 @@
+<div class="app-shell" [attr.data-theme]="theme()">
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-mark">Q</span><div><strong>Quant Strategy</strong><small>Operations Console</small></div></div>
+    <nav aria-label="Main navigation">
+      <div class="menu-title"><span>OVERVIEW</span></div>
+      <div class="submenu">
+        <button class="nav-item" [class.active]="activePage() === 'dashboard'" type="button" (click)="activePage.set('dashboard')"><span>◫</span><div><strong>Momentum Dashboard</strong><small>Strategy overview</small></div></button>
+      </div>
+      <div class="menu-title"><span>MASTER</span><i>⌄</i></div>
+      <div class="submenu">
+        <button class="nav-item" [class.active]="activePage() === 'price'" type="button" (click)="activePage.set('price')"><span>⌁</span><div><strong>Price Data Master</strong><small>Update market prices</small></div></button>
+        <button class="nav-item" [class.active]="activePage() === 'stocks'" type="button" (click)="activePage.set('stocks')"><span>▥</span><div><strong>Stock Master</strong><small>Manage stock records</small></div></button>
+        <button class="nav-item" [class.active]="activePage() === 'etfs'" type="button" (click)="activePage.set('etfs')"><span>◇</span><div><strong>ETF Master</strong><small>Manage ETF records</small></div></button>
+        <button class="nav-item" [class.active]="activePage() === 'indexes'" type="button" (click)="activePage.set('indexes')"><span>◎</span><div><strong>Index Master</strong><small>Manage index records</small></div></button>
+      </div>
+      <div class="menu-title"><span>ANALYSIS</span><i>⌄</i></div>
+      <div class="submenu"><button class="nav-item" [class.active]="activePage() === 'momentum'" type="button" (click)="activePage.set('momentum')"><span>↗</span><div><strong>Momentum Analysis</strong><small>Calculate and rank assets</small></div></button><button class="nav-item" [class.active]="activePage() === 'experiment'" type="button" (click)="activePage.set('experiment')"><span>◉</span><div><strong>OHLCV Experiment</strong><small>Pure price-volume score</small></div></button><button class="nav-item" [class.active]="activePage() === 'technical-indicator'" type="button" (click)="activePage.set('technical-indicator')"><span>⌁</span><div><strong>Technical Indicator</strong><small>EMA and SuperTrend signals</small></div></button></div>
+    </nav>
+    <div class="sidebar-footer"><label class="theme-control" for="appTheme"><span>Colour theme</span><select id="appTheme" [ngModel]="theme()" (ngModelChange)="setTheme($event)"><option value="forest">Forest</option><option value="ocean">Ocean</option><option value="slate">Slate</option><option value="contrast">High contrast</option></select></label><div class="api-status"><span class="status-dot"></span><div><strong>API endpoint</strong><small>localhost:8080</small></div></div></div>
+  </aside>
+  <main>@if (activePage() === 'dashboard') {<app-momentum-dashboard (openAnalysis)="activePage.set('momentum')" />} @else if (activePage() === 'price') {
+    <header><div><p class="eyebrow">MARKET DATA</p><h1>Price Data Master</h1><p class="subtitle">Fetch and update historical price data for every instrument class.</p></div><a class="swagger" href="http://localhost:8080/swagger-ui/index.html#/price-data-controller" target="_blank" rel="noreferrer">API documentation ↗</a></header>
+    @if (notice()) {<div class="notice" [class.error]="notice()?.type === 'error'"><span>{{ notice()?.type === 'success' ? '✓' : '!' }}</span><p>{{ notice()?.message }}</p><button type="button" aria-label="Dismiss notification" (click)="notice.set(null)">×</button></div>}
+    <section class="control-panel">
+      <div><label for="timeFrame">Time frame</label><p>Select the candle interval used for all updates.</p></div>
+      <select id="timeFrame" [ngModel]="timeFrame()" (ngModelChange)="timeFrame.set($event)"><option value="DAILY">Daily</option><option value="WEEKLY">Weekly</option></select>
+      <button class="primary" type="button" (click)="syncAll()" [disabled]="isAnyLoading()">@if (isAnyLoading()) {<span class="spinner"></span> Updating…} @else {Update all data}</button>
+    </section>
+    <section class="cards" aria-label="Price data operations">
+      @for (source of sources; track source.key) {<article class="data-card"><div class="card-top"><span [class]="'icon ' + source.key">{{ source.icon }}</span><span class="ready"><i></i> Ready</span></div><h2>{{ source.title }}</h2><p>{{ source.description }}</p><div class="selection"><span>Selected frequency</span><strong>{{ timeFrame() === 'DAILY' ? 'Daily prices' : 'Weekly prices' }}</strong></div><button type="button" (click)="sync(source)" [disabled]="loading()[source.key]">@if (loading()[source.key]) {<span class="spinner"></span> Updating…} @else {Update {{ source.shortTitle }} <span>→</span>}</button></article>}
+    </section>
+    <section class="history">
+      <div class="section-heading"><div><h2>Request history</h2><p>Updates run during this browser session.</p></div>@if (history().length) {<button class="text-button" type="button" (click)="clearHistory()">Clear history</button>}</div>
+      @if (history().length) {<div class="table-wrap"><table><thead><tr><th>Data type</th><th>Frequency</th><th>Status</th><th>Completed</th><th>Details</th><th></th></tr></thead><tbody>@for (item of history(); track item.id) {<tr><td><strong>{{ item.title }}</strong></td><td>{{ item.timeFrame === 'DAILY' ? 'Daily' : 'Weekly' }}</td><td><span class="result" [class.failed]="!item.success">{{ item.success ? 'Completed' : 'Needs attention' }}</span></td><td>{{ item.completedAt | date:'mediumTime' }}</td><td class="response" [title]="item.message">{{ item.message }}</td><td><button class="retry" type="button" (click)="retry(item)" aria-label="Retry update">↻</button></td></tr>}</tbody></table></div>} @else {<div class="empty"><span>↻</span><h3>No updates yet</h3><p>Choose a data type above to start your first price update.</p></div>}
+    </section>
+  } @else if (activePage() === 'stocks') {<app-stock-master />} @else if (activePage() === 'etfs') {<app-etf-master />} @else if (activePage() === 'indexes') {<app-index-master />} @else if (activePage() === 'momentum') {<app-momentum-analysis />} @else if (activePage() === 'experiment') {<app-ohlcv-experiment />} @else {<app-technical-indicator />} </main>
+</div>

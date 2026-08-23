@@ -64,7 +64,7 @@ public class PriceDataService {
 
         String toDate = currentDate.format(formatter);
 
-        LocalDate beforeYearDate = DateUtil.getDateBeforeYear(currentDate, 1);
+        LocalDate beforeYearDate = DateUtil.getDateBeforeYear(currentDate, 2);
         beforeYearDate = DateUtil.getFridayDateIfWeekend(beforeYearDate);
 
         String fromDate = beforeYearDate.format(formatter);
@@ -207,24 +207,9 @@ public class PriceDataService {
 
             stockPricesJson.setTimeFrame(timeFrame);
 
-            List<OHLCV> ohlcvDataList =
-                    candleDataList.stream()
-                            .map(c -> {
-
-                                OHLCV o = new OHLCV();
-
-                                o.setDate(c.getPriceDate());
-                                o.setOpen(c.getOpen());
-                                o.setHigh(c.getHigh());
-                                o.setLow(c.getLow());
-                                o.setClose(c.getClose());
-                                o.setVolume(c.getVolume());
-
-                                return o;
-
-                            }).collect(Collectors.toList());
-
-            stockPricesJson.setOhlcvData(ohlcvDataList);
+            stockPricesJson.setOhlcvData(
+                    mergeOhlcvData(stockPricesJson.getOhlcvData(), candleDataList)
+            );
 
             toSave.add(stockPricesJson);
         }
@@ -246,6 +231,9 @@ public class PriceDataService {
         String toDate = currentDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
 
         String interval = "days";
+
+        LocalDate historyStartDate = DateUtil.getFridayDateIfWeekend(
+                DateUtil.getDateBeforeYear(currentDate, 2));
 
         List<StockPricesJson> existingList =
                 stockPriceDataRepository.findAll();
@@ -293,26 +281,26 @@ public class PriceDataService {
             Optional<LocalDate> lastPriceDate =
                     getLastPriceDate(stockPricesJson);
 
+            Optional<LocalDate> firstPriceDate =
+                    getFirstPriceDate(stockPricesJson);
+
             if (lastPriceDate.isPresent()
-                    && !lastPriceDate.get().isBefore(currentDate)) {
+                    && !lastPriceDate.get().isBefore(currentDate)
+                    && firstPriceDate.isPresent()
+                    && !firstPriceDate.get().isAfter(historyStartDate)) {
 
                 skippedCount++;
 
                 continue;
             }
 
-            LocalDate fromLocalDate =
-                    lastPriceDate.orElse(DateUtil.getDateBeforeYear(currentDate, 1));
-
-            fromLocalDate = DateUtil.getFridayDateIfWeekend(fromLocalDate);
-
             String fromDate =
-                    fromLocalDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                    historyStartDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
 
             String instrumentKey = "NSE_EQ|" + stockData.getIsinNumber();
 
             log.info(
-                    "Fetching startup stock price update for stock: {} from {} to {} ({}/{})",
+                    "Fetching rolling two-year stock price update for stock: {} from {} to {} ({}/{})",
                     stockData.getNameOfCompany(),
                     fromDate,
                     toDate,
@@ -420,6 +408,9 @@ public class PriceDataService {
 
         String interval = "days";
 
+        LocalDate historyStartDate = DateUtil.getFridayDateIfWeekend(
+                DateUtil.getDateBeforeYear(currentDate, 2));
+
         List<ETFPricesJson> existingList =
                 etfPriceDataRepository.findAll();
 
@@ -466,26 +457,26 @@ public class PriceDataService {
             Optional<LocalDate> lastPriceDate =
                     getLastPriceDate(etfPricesJson);
 
+            Optional<LocalDate> firstPriceDate =
+                    getFirstPriceDate(etfPricesJson);
+
             if (lastPriceDate.isPresent()
-                    && !lastPriceDate.get().isBefore(currentDate)) {
+                    && !lastPriceDate.get().isBefore(currentDate)
+                    && firstPriceDate.isPresent()
+                    && !firstPriceDate.get().isAfter(historyStartDate)) {
 
                 skippedCount++;
 
                 continue;
             }
 
-            LocalDate fromLocalDate =
-                    lastPriceDate.orElse(DateUtil.getDateBeforeYear(currentDate, 1));
-
-            fromLocalDate = DateUtil.getFridayDateIfWeekend(fromLocalDate);
-
             String fromDate =
-                    fromLocalDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                    historyStartDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
 
             String instrumentKey = "NSE_EQ|" + indexData.getIsinNumber();
 
             log.info(
-                    "Fetching startup ETF price update for ETF: {} from {} to {} ({}/{})",
+                    "Fetching rolling two-year ETF price update for ETF: {} from {} to {} ({}/{})",
                     indexData.getSecurityName(),
                     fromDate,
                     toDate,
@@ -702,32 +693,34 @@ public class PriceDataService {
     public boolean isPriceDataUpdatedTillCurrentTradingDate(AssetDataType assetDataType) {
 
         LocalDate currentDate = DateUtil.getFridayDateIfWeekend(LocalDate.now());
-        Optional<LocalDate> latestUpdatedOnDate = Optional.empty();
+        List<List<OHLCV>> priceSeries = List.of();
 
         if (AssetDataType.STOCK == assetDataType) {
 
-            latestUpdatedOnDate = getLatestUpdatedOnDate(stockPriceDataRepository.findAll());
+            priceSeries = stockPriceDataRepository.findAll().stream()
+                    .map(StockPricesJson::getOhlcvData)
+                    .toList();
         }
 
         if (AssetDataType.ETF == assetDataType) {
 
-            latestUpdatedOnDate = getLatestETFUpdatedOnDate(etfPriceDataRepository.findAll());
+            priceSeries = etfPriceDataRepository.findAll().stream()
+                    .map(ETFPricesJson::getOhlcvData)
+                    .toList();
         }
 
         if (AssetDataType.INDEX == assetDataType) {
 
-            latestUpdatedOnDate = getLatestIndexUpdatedOnDate(indexPriceDataRepository.findAll());
+            priceSeries = indexPriceDataRepository.findAll().stream()
+                    .map(IndexPricesJson::getOhlcvData)
+                    .toList();
         }
 
-        boolean updatedTillCurrentTradingDate =
-                latestUpdatedOnDate
-                        .map(updatedOnDate -> updatedOnDate.isEqual(currentDate))
-                        .orElse(false);
+        boolean updatedTillCurrentTradingDate = coversRollingTwoYearWindow(priceSeries, currentDate);
 
         log.info(
-                "{} price latest updatedOn date: {}, current trading date: {}, updated: {}",
+                "{} price data covers the rolling two-year window ending {}: {}",
                 assetDataType,
-                latestUpdatedOnDate.map(LocalDate::toString).orElse("empty"),
                 currentDate,
                 updatedTillCurrentTradingDate
         );
@@ -752,6 +745,20 @@ public class PriceDataService {
                 .max(Comparator.naturalOrder());
     }
 
+    private Optional<LocalDate> getFirstPriceDate(StockPricesJson stockPricesJson) {
+        if (stockPricesJson == null
+                || stockPricesJson.getOhlcvData() == null
+                || stockPricesJson.getOhlcvData().isEmpty()) {
+            return Optional.empty();
+        }
+        return stockPricesJson.getOhlcvData().stream()
+                .filter(Objects::nonNull)
+                .map(OHLCV::getDate)
+                .filter(Objects::nonNull)
+                .map(DateUtil::convertDateToLocalDate)
+                .min(Comparator.naturalOrder());
+    }
+
     private Optional<LocalDate> getLastPriceDate(ETFPricesJson etfPricesJson) {
 
         if (etfPricesJson == null
@@ -767,6 +774,50 @@ public class PriceDataService {
                 .filter(Objects::nonNull)
                 .map(DateUtil::convertDateToLocalDate)
                 .max(Comparator.naturalOrder());
+    }
+
+    private Optional<LocalDate> getFirstPriceDate(ETFPricesJson etfPricesJson) {
+        if (etfPricesJson == null
+                || etfPricesJson.getOhlcvData() == null
+                || etfPricesJson.getOhlcvData().isEmpty()) {
+            return Optional.empty();
+        }
+        return etfPricesJson.getOhlcvData().stream()
+                .filter(Objects::nonNull)
+                .map(OHLCV::getDate)
+                .filter(Objects::nonNull)
+                .map(DateUtil::convertDateToLocalDate)
+                .min(Comparator.naturalOrder());
+    }
+
+    private boolean coversRollingTwoYearWindow(List<List<OHLCV>> priceSeries, LocalDate currentDate) {
+        LocalDate requiredStartDate = DateUtil.getFridayDateIfWeekend(
+                DateUtil.getDateBeforeYear(currentDate, 2));
+        LocalDate earliestDate = null;
+        LocalDate latestDate = null;
+
+        for (List<OHLCV> prices : priceSeries) {
+            if (prices == null) {
+                continue;
+            }
+            for (OHLCV price : prices) {
+                if (price == null || price.getDate() == null) {
+                    continue;
+                }
+                LocalDate priceDate = DateUtil.convertDateToLocalDate(price.getDate());
+                if (earliestDate == null || priceDate.isBefore(earliestDate)) {
+                    earliestDate = priceDate;
+                }
+                if (latestDate == null || priceDate.isAfter(latestDate)) {
+                    latestDate = priceDate;
+                }
+            }
+        }
+
+        return earliestDate != null
+                && latestDate != null
+                && !earliestDate.isAfter(requiredStartDate)
+                && !latestDate.isBefore(currentDate);
     }
 
     private Optional<LocalDate> getLatestUpdatedOnDate(List<StockPricesJson> stockPricesJsonList) {
@@ -919,7 +970,7 @@ public class PriceDataService {
 
         String toDate = currentDate.format(formatter);
 
-        LocalDate beforeYearDate = DateUtil.getDateBeforeYear(currentDate, 1);
+        LocalDate beforeYearDate = DateUtil.getDateBeforeYear(currentDate, 2);
 
         beforeYearDate = DateUtil.getFridayDateIfWeekend(beforeYearDate);
 
@@ -1082,25 +1133,8 @@ public class PriceDataService {
 
             etfPricesJson.setTimeFrame(timeFrame);
 
-            List<OHLCV> ohlcvDataList =
-                    candleDataList.stream()
-                            .map(c -> {
-
-                                OHLCV o = new OHLCV();
-
-                                o.setDate(c.getPriceDate());
-                                o.setOpen(c.getOpen());
-                                o.setHigh(c.getHigh());
-                                o.setLow(c.getLow());
-                                o.setClose(c.getClose());
-                                o.setVolume(c.getVolume());
-
-                                return o;
-
-                            }).collect(Collectors.toList());
-
             etfPricesJson.setOhlcvData(
-                    ohlcvDataList
+                    mergeOhlcvData(etfPricesJson.getOhlcvData(), candleDataList)
             );
 
             toSave.add(etfPricesJson);
