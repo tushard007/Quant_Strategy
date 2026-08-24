@@ -9,7 +9,6 @@ import org.factor_investing.quant_strategy.repository.TopMomentumStockRepository
 import org.factor_investing.quant_strategy.service.StockPriceCacheService;
 import org.factor_investing.quant_strategy.strategies.OHLCV;
 import org.factor_investing.quant_strategy.util.DateUtil;
-import org.factor_investing.quant_strategy.util.ReturnCalculationUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,7 +20,6 @@ import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static org.factor_investing.quant_strategy.util.DateUtil.convertToLocalDateSet;
 
 @Service
 @Slf4j
@@ -119,7 +117,7 @@ public class StockMomentumService {
                 List<OHLCV> ohlcData = entry.getValue();
                 count++;
                 try {
-                    StockMomentum momentum = calculateStockMomentum(stockName, ohlcData, assetDataType, asOfDate);
+                    StockMomentum momentum = calculateStockMomentum(stockName, ohlcData, asOfDate);
                     if (momentum != null) {
                         allResults.add(momentum);
                         if (momentum.isQualifiesForMomentum()) {
@@ -181,63 +179,43 @@ public class StockMomentumService {
     /**
      * Calculate momentum for a single stock
      */
-    private StockMomentum calculateStockMomentum(String stockName, List<OHLCV> ohlcData,
-                                                  AssetDataType assetDataType, LocalDate asOfDate) {
+    StockMomentum calculateStockMomentum(String stockName, List<OHLCV> ohlcData, LocalDate asOfDate) {
         if (ohlcData == null || ohlcData.isEmpty()) {
             return null;
         }
-        if (ohlcData.size() > MomentumConstants.MIN_DATA_POINTS) {
-
-            Set<Date> allUniqueStockPrice = stockPriceCacheService.getAllAssetWisePriceDateBySymbol(stockName,assetDataType);
-            Set<LocalDate> allUniqueStockPriceLocaleDates = convertToLocalDateSet(allUniqueStockPrice);
-
-            LocalDate currentDate = DateUtil.findNearestPastDate(allUniqueStockPriceLocaleDates, asOfDate);
-            LocalDate previous1YearDate = DateUtil.findNearestPastDate(
-                    allUniqueStockPriceLocaleDates, DateUtil.getDateBeforeYear(asOfDate, 1));
-            LocalDate previous6MonthDate = DateUtil.findNearestPastDate(
-                    allUniqueStockPriceLocaleDates, DateUtil.getDateBeforeMonth(asOfDate, 6));
-            LocalDate previous3MonthDate = DateUtil.findNearestPastDate(
-                    allUniqueStockPriceLocaleDates, DateUtil.getDateBeforeMonth(asOfDate, 3));
-
-            if (currentDate == null || previous1YearDate == null
-                    || previous6MonthDate == null || previous3MonthDate == null) {
-                return null;
-            }
-            // Fetch prices for the required dates
-            Double currentPrice = getMostRecentPrice(stockName, currentDate,assetDataType);
-            Double previous1YearPrice = getMostRecentPrice(stockName, previous1YearDate,assetDataType);
-            Double previous6MonthPrice = getMostRecentPrice(stockName, previous6MonthDate,assetDataType);
-            Double previous3MonthPrice = getMostRecentPrice(stockName, previous3MonthDate,assetDataType);
-
-            if (currentPrice == null || previous1YearPrice == null || previous6MonthPrice == null || previous3MonthPrice == null) {
-                return null;
-            } else {
-                log.info("==============/n currentPrice:{}, previous1YearPrice:{}, previous6MonthPrice:{}, previous3MonthPrice:{}", currentPrice, previous1YearPrice, previous6MonthPrice, previous3MonthPrice);
-            }
-
-            // Calculate returns for different periods
-            Float oneYearReturn = ReturnCalculationUtils.percentReturn(previous1YearPrice.floatValue(), currentPrice.floatValue());
-            Float sixMonthReturn = ReturnCalculationUtils.percentReturn(previous6MonthPrice.floatValue(), currentPrice.floatValue());
-            Float threeMonthReturn = ReturnCalculationUtils.percentReturn(previous3MonthPrice.floatValue(), currentPrice.floatValue());
-            log.info("oneYearReturn:{}, sixMonthReturn:{}, threeMonthReturn:{}\n====================",
-                    oneYearReturn, sixMonthReturn, threeMonthReturn);
-            return new StockMomentum(stockName, oneYearReturn, sixMonthReturn, threeMonthReturn, asOfDate);
-        } else {
+        NavigableMap<LocalDate, OHLCV> uniqueBars = new TreeMap<>();
+        ohlcData.stream().filter(Objects::nonNull)
+                .filter(bar -> bar.getDate() != null)
+                .filter(bar -> !DateUtil.convertDateToLocalDate(bar.getDate()).isAfter(asOfDate))
+                .forEach(bar -> uniqueBars.put(DateUtil.convertDateToLocalDate(bar.getDate()), bar));
+        List<OHLCV> bars = new ArrayList<>(uniqueBars.values());
+        if (bars.size() < MomentumConstants.MIN_DATA_POINTS) {
             log.error(
                     "Insufficient data points for {}. Required: {}, Provided: {}",
                     stockName,
                     MomentumConstants.MIN_DATA_POINTS,
-                    ohlcData.size()
+                    bars.size()
             );
             return null;
         }
+        int currentIndex = bars.size() - 1;
+        double currentPrice = bars.get(currentIndex).getClose();
+        double previous1YearPrice = bars.get(currentIndex - 252).getClose();
+        double previous6MonthPrice = bars.get(currentIndex - 126).getClose();
+        double previous3MonthPrice = bars.get(currentIndex - 63).getClose();
+        if (currentPrice <= 0 || previous1YearPrice <= 0 || previous6MonthPrice <= 0 || previous3MonthPrice <= 0) return null;
+
+        Float oneYearReturn = percentageReturn(currentPrice, previous1YearPrice);
+        Float sixMonthReturn = percentageReturn(currentPrice, previous6MonthPrice);
+        Float threeMonthReturn = percentageReturn(currentPrice, previous3MonthPrice);
+        log.info("Trading-bar momentum {} as of {}: close={}, t-252={} ({}%), t-126={} ({}%), t-63={} ({}%)",
+                stockName, uniqueBars.lastKey(), currentPrice, previous1YearPrice, oneYearReturn,
+                previous6MonthPrice, sixMonthReturn, previous3MonthPrice, threeMonthReturn);
+        return new StockMomentum(stockName, oneYearReturn, sixMonthReturn, threeMonthReturn, asOfDate);
     }
 
-    /**
-     * Get the most recent price data
-     */
-    private double getMostRecentPrice(String stockName, LocalDate priceDate,AssetDataType assetDataType) {
-        return stockPriceCacheService.getStockClosingPriceBySymbolAndDate(stockName, priceDate,assetDataType);
+    private Float percentageReturn(double currentPrice, double previousPrice) {
+        return (float) ((currentPrice / previousPrice - 1.0) * 100.0);
     }
 
     public void assignRanks_old(AssetDataType assetDataType) {

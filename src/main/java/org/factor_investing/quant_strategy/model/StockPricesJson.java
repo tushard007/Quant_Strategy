@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
-@Table(name = "t_stock_price_data_json")
+@Table(name = "t_stock_price_data_json", uniqueConstraints = @UniqueConstraint(name = "uk_stock_price_symbol_timeframe", columnNames = {"stock_symbol", "time_frame"}))
 @NoArgsConstructor
 @AllArgsConstructor
 @Getter
@@ -25,11 +25,12 @@ public class StockPricesJson {
     @Column(columnDefinition = "jsonb")
     private List<OHLCV> ohlcvData;
 
-    @OneToOne
+    @ManyToOne
     @JoinColumn(name = "stock_symbol", referencedColumnName = "symbol", nullable = false)
     private NSEStockMasterData nseStockMasterData;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "time_frame", nullable = false)
     private PriceFrequencey timeFrame;
 
     @UpdateTimestamp

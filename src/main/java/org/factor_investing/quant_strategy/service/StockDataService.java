@@ -3,6 +3,7 @@ package org.factor_investing.quant_strategy.service;
 import org.factor_investing.quant_strategy.model.ETFPricesJson;
 import org.factor_investing.quant_strategy.model.IndexPricesJson;
 import org.factor_investing.quant_strategy.model.StockPricesJson;
+import org.factor_investing.quant_strategy.model.PriceFrequencey;
 import org.factor_investing.quant_strategy.repository.ETFPriceDataRepository;
 import org.factor_investing.quant_strategy.repository.IndexPriceDataRepository;
 import org.factor_investing.quant_strategy.repository.StockDataRepository;
@@ -28,14 +29,14 @@ public class StockDataService {
     }
 
     public List<StockPricesJson> getAllStockData() {
-        return stockDataRepository.findAll();
+        return stockDataRepository.findAllByTimeFrame(PriceFrequencey.DAILY);
     }
 
     public List<ETFPricesJson> getAllETFData() {
-        return etfPriceDataRepository.findAll();
+        return etfPriceDataRepository.findAllByTimeFrame(PriceFrequencey.DAILY);
     }
 
     public List<IndexPricesJson> getAllIndexData() {
-        return indexPriceDataRepository.findAll();
+        return indexPriceDataRepository.findAllByTimeFrame(PriceFrequencey.DAILY);
     }
 }

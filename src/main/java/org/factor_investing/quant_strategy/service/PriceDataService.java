@@ -21,8 +21,10 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -166,6 +168,7 @@ public class PriceDataService {
 
         List<StockPricesJson> existingList =
                 stockPriceDataRepository.findAll();
+        sanitizeStoredStockPrices(existingList);
 
         /*
          * Existing DB records map
@@ -173,6 +176,7 @@ public class PriceDataService {
         Map<String, StockPricesJson> existingMap =
                 existingList.stream()
                         .filter(Objects::nonNull)
+                        .filter(item -> item.getTimeFrame() == timeFrame)
                         .filter(spj ->
                                 spj.getNseStockMasterData() != null
                                         && spj.getNseStockMasterData().getSymbol() != null
@@ -237,6 +241,7 @@ public class PriceDataService {
 
         List<StockPricesJson> existingList =
                 stockPriceDataRepository.findAll();
+        sanitizeStoredStockPrices(existingList);
 
         if (existingList == null || existingList.isEmpty()) {
 
@@ -248,6 +253,7 @@ public class PriceDataService {
         Map<String, StockPricesJson> existingMap =
                 existingList.stream()
                         .filter(Objects::nonNull)
+                        .filter(item -> item.getTimeFrame() == timeFrame)
                         .filter(spj ->
                                 spj.getNseStockMasterData() != null
                                         && spj.getNseStockMasterData().getSymbol() != null
@@ -413,6 +419,7 @@ public class PriceDataService {
 
         List<ETFPricesJson> existingList =
                 etfPriceDataRepository.findAll();
+        sanitizeStoredETFPrices(existingList);
 
         if (existingList == null || existingList.isEmpty()) {
 
@@ -424,6 +431,7 @@ public class PriceDataService {
         Map<String, ETFPricesJson> existingMap =
                 existingList.stream()
                         .filter(Objects::nonNull)
+                        .filter(item -> item.getTimeFrame() == timeFrame)
                         .filter(etfPricesJson ->
                                 etfPricesJson.getNseETFMasterData() != null
                                         && etfPricesJson.getNseETFMasterData().getSymbol() != null
@@ -600,9 +608,12 @@ public class PriceDataService {
 
         String interval = PriceFrequencey.WEEKLY.equals(timeFrame) ? "weeks" : "days";
 
+        List<IndexPricesJson> existingList = indexPriceDataRepository.findAll();
+        sanitizeStoredIndexPrices(existingList);
         Map<String, IndexPricesJson> existingMap =
-                indexPriceDataRepository.findAll().stream()
+                existingList.stream()
                         .filter(Objects::nonNull)
+                        .filter(item -> item.getTimeFrame() == timeFrame)
                         .filter(indexPricesJson ->
                                 indexPricesJson.getNseIndexMasterData() != null
                                         && indexPricesJson.getNseIndexMasterData().getSymbol() != null
@@ -696,22 +707,28 @@ public class PriceDataService {
         List<List<OHLCV>> priceSeries = List.of();
 
         if (AssetDataType.STOCK == assetDataType) {
-
-            priceSeries = stockPriceDataRepository.findAll().stream()
+            List<StockPricesJson> records = stockPriceDataRepository.findAll();
+            sanitizeStoredStockPrices(records);
+            priceSeries = records.stream()
+                    .filter(item -> item.getTimeFrame() == PriceFrequencey.DAILY)
                     .map(StockPricesJson::getOhlcvData)
                     .toList();
         }
 
         if (AssetDataType.ETF == assetDataType) {
-
-            priceSeries = etfPriceDataRepository.findAll().stream()
+            List<ETFPricesJson> records = etfPriceDataRepository.findAll();
+            sanitizeStoredETFPrices(records);
+            priceSeries = records.stream()
+                    .filter(item -> item.getTimeFrame() == PriceFrequencey.DAILY)
                     .map(ETFPricesJson::getOhlcvData)
                     .toList();
         }
 
         if (AssetDataType.INDEX == assetDataType) {
-
-            priceSeries = indexPriceDataRepository.findAll().stream()
+            List<IndexPricesJson> records = indexPriceDataRepository.findAll();
+            sanitizeStoredIndexPrices(records);
+            priceSeries = records.stream()
+                    .filter(item -> item.getTimeFrame() == PriceFrequencey.DAILY)
                     .map(IndexPricesJson::getOhlcvData)
                     .toList();
         }
@@ -914,11 +931,70 @@ public class PriceDataService {
             }
         }
 
-        return mergedDataByDate.entrySet().stream()
+        List<OHLCV> merged = mergedDataByDate.entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())
                 .map(Map.Entry::getValue)
                 .collect(Collectors.toList());
+        validateUniqueTradingDates(merged);
+        return merged;
     }
+
+    private void sanitizeStoredStockPrices(List<StockPricesJson> records) {
+        List<StockPricesJson> changed = records.stream().filter(Objects::nonNull).filter(record -> {
+            List<OHLCV> normalized = normalizeOhlcvData(record.getOhlcvData());
+            if (size(record.getOhlcvData()) == normalized.size()) return false;
+            log.warn("Removed duplicate stock trading dates: symbol={}, timeframe={}, before={}, after={}",
+                    record.getNseStockMasterData() == null ? "unknown" : record.getNseStockMasterData().getSymbol(),
+                    record.getTimeFrame(), size(record.getOhlcvData()), normalized.size());
+            record.setOhlcvData(normalized); return true;
+        }).toList();
+        if (!changed.isEmpty()) stockPriceDataRepository.saveAll(changed);
+    }
+
+    private void sanitizeStoredETFPrices(List<ETFPricesJson> records) {
+        List<ETFPricesJson> changed = records.stream().filter(Objects::nonNull).filter(record -> {
+            List<OHLCV> normalized = normalizeOhlcvData(record.getOhlcvData());
+            if (size(record.getOhlcvData()) == normalized.size()) return false;
+            log.warn("Removed duplicate ETF trading dates: symbol={}, timeframe={}, before={}, after={}",
+                    record.getNseETFMasterData() == null ? "unknown" : record.getNseETFMasterData().getSymbol(),
+                    record.getTimeFrame(), size(record.getOhlcvData()), normalized.size());
+            record.setOhlcvData(normalized); return true;
+        }).toList();
+        if (!changed.isEmpty()) etfPriceDataRepository.saveAll(changed);
+    }
+
+    private void sanitizeStoredIndexPrices(List<IndexPricesJson> records) {
+        List<IndexPricesJson> changed = records.stream().filter(Objects::nonNull).filter(record -> {
+            List<OHLCV> normalized = normalizeOhlcvData(record.getOhlcvData());
+            if (size(record.getOhlcvData()) == normalized.size()) return false;
+            log.warn("Removed duplicate index trading dates: symbol={}, timeframe={}, before={}, after={}",
+                    record.getNseIndexMasterData() == null ? "unknown" : record.getNseIndexMasterData().getSymbol(),
+                    record.getTimeFrame(), size(record.getOhlcvData()), normalized.size());
+            record.setOhlcvData(normalized); return true;
+        }).toList();
+        if (!changed.isEmpty()) indexPriceDataRepository.saveAll(changed);
+    }
+
+    List<OHLCV> normalizeOhlcvData(List<OHLCV> source) {
+        if (source == null || source.isEmpty()) return new ArrayList<>();
+        NavigableMap<LocalDate, OHLCV> unique = new TreeMap<>();
+        source.stream().filter(Objects::nonNull).filter(bar -> bar.getDate() != null)
+                .forEach(bar -> unique.put(DateUtil.convertDateToLocalDate(bar.getDate()), bar));
+        List<OHLCV> normalized = new ArrayList<>(unique.values());
+        validateUniqueTradingDates(normalized);
+        return normalized;
+    }
+
+    void validateUniqueTradingDates(List<OHLCV> rows) {
+        long uniqueDates = rows.stream().filter(Objects::nonNull).filter(row -> row.getDate() != null)
+                .map(row -> DateUtil.convertDateToLocalDate(row.getDate())).distinct().count();
+        if (rows.size() != uniqueDates) {
+            throw new IllegalStateException("OHLCV validation failed: row count " + rows.size()
+                    + " does not match unique trading-date count " + uniqueDates);
+        }
+    }
+
+    private int size(List<OHLCV> rows) { return rows == null ? 0 : rows.size(); }
 
     /*
      * Retry implementation with exponential backoff
@@ -1086,6 +1162,7 @@ public class PriceDataService {
 
         List<ETFPricesJson> existingList =
                 etfPriceDataRepository.findAll();
+        sanitizeStoredETFPrices(existingList);
 
         /*
          * Existing ETF DB records map
@@ -1093,6 +1170,7 @@ public class PriceDataService {
         Map<String, ETFPricesJson> existingMap =
                 existingList.stream()
                         .filter(Objects::nonNull)
+                        .filter(item -> item.getTimeFrame() == timeFrame)
                         .filter(etfPricesJson ->
                                 etfPricesJson.getNseETFMasterData() != null
                                         && etfPricesJson.getNseETFMasterData()

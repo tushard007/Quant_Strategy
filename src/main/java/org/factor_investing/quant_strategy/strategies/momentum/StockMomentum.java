@@ -36,9 +36,9 @@ public class StockMomentum {
     public String toString() {
         return String.format("%s: 1Y=%.2f%%, 6M=%.2f%%, 3M=%.2f%% %s",
                 stockName,
-                oneYearReturn * 100,
-                sixMonthReturn * 100,
-                threeMonthReturn * 100,
+                oneYearReturn,
+                sixMonthReturn,
+                threeMonthReturn,
                 qualifiesForMomentum ? "✓" : "✗");
     }
 }

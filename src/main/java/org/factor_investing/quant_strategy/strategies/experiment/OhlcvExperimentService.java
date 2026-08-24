@@ -51,9 +51,12 @@ public class OhlcvExperimentService {
 
     private MutableRow features(String ticker, String theme, List<OHLCV> source, LocalDate requestedDate) {
         if (source == null) return null;
-        List<OHLCV> bars = source.stream().filter(Objects::nonNull)
+        NavigableMap<LocalDate, OHLCV> uniqueBars = new TreeMap<>();
+        source.stream().filter(Objects::nonNull)
+                .filter(bar -> bar.getDate() != null)
                 .filter(bar -> requestedDate == null || !DateUtil.convertDateToLocalDate(bar.getDate()).isAfter(requestedDate))
-                .sorted(Comparator.comparing(OHLCV::getDate)).toList();
+                .forEach(bar -> uniqueBars.put(DateUtil.convertDateToLocalDate(bar.getDate()), bar));
+        List<OHLCV> bars = new ArrayList<>(uniqueBars.values());
         int size = bars.size();
         if (size < 253) return null;
         int t = size - 1;

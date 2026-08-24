@@ -39,6 +39,19 @@ class OhlcvExperimentServiceTest {
         assertThat(result.skippedCount()).isEqualTo(1);
     }
 
+    @Test
+    void duplicateTradingDatesDoNotChangeBarOffsets() {
+        List<OHLCV> source = new ArrayList<>(bars(100, 1));
+        OHLCV duplicate = source.get(200);
+        source.add(new OHLCV(duplicate.getDate(), duplicate.getOpen(), duplicate.getHigh(), duplicate.getLow(), duplicate.getClose(), duplicate.getVolume()));
+
+        OhlcvExperimentResult result = new OhlcvExperimentService(null, null, null)
+                .run(AssetDataType.ETF, Map.of("DUPLICATE", source), LocalDate.of(2026, 8, 23));
+
+        assertThat(result.scoredCount()).isEqualTo(1);
+        assertThat(result.results().getFirst().ret12()).isCloseTo(2.52, org.assertj.core.data.Offset.offset(.000001));
+    }
+
     private List<OHLCV> bars(double start, double dailyStep) {
         List<OHLCV> values = new ArrayList<>(); LocalDate date = LocalDate.of(2025, 1, 1);
         for (int index = 0; index < 253; index++) { double close = start + index * dailyStep; values.add(new OHLCV(Date.valueOf(date.plusDays(index)), close - .5, close + 1, close - 1, close, 1000 + index)); }

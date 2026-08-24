@@ -9,7 +9,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -23,7 +24,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
-@Table(name = "t_index_price_data_json")
+@Table(name = "t_index_price_data_json", uniqueConstraints = @UniqueConstraint(name = "uk_index_price_symbol_timeframe", columnNames = {"index_symbol", "time_frame"}))
 @NoArgsConstructor
 @AllArgsConstructor
 @Getter
@@ -38,11 +39,12 @@ public class IndexPricesJson {
     @Column(columnDefinition = "jsonb")
     private List<OHLCV> ohlcvData;
 
-    @OneToOne
+    @ManyToOne
     @JoinColumn(name = "index_symbol", referencedColumnName = "symbol", nullable = false)
     private NSEIndexMasterData nseIndexMasterData;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "time_frame", nullable = false)
     private PriceFrequencey timeFrame;
 
     @UpdateTimestamp
