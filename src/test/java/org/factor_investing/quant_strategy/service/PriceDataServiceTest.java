@@ -11,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PriceDataServiceTest {
-    private final PriceDataService service = new PriceDataService(null, null, null, null, null, null);
+    private final PriceDataService service = new PriceDataService(null, null, null, null, null, null, null);
 
     @Test
     void normalizesByLocalTradingDateAndKeepsReplacementBar() {

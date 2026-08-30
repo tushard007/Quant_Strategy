@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(
         name = "stock-price.startup-update.enabled",
         havingValue = "true",
-        matchIfMissing = true
+        matchIfMissing = false
 )
 public class StockPriceStartupUpdateRunner implements ApplicationRunner {
 
@@ -50,7 +50,7 @@ public class StockPriceStartupUpdateRunner implements ApplicationRunner {
             return;
         }
 
-        log.info("Starting rolling two-year stock price update on application startup");
+        log.info("Starting maximum-available stock price update on application startup");
 
         String result = priceDataService.updateStockPriceDataFromLastDate();
 
@@ -70,7 +70,7 @@ public class StockPriceStartupUpdateRunner implements ApplicationRunner {
             return;
         }
 
-        log.info("Starting rolling two-year ETF price update on application startup");
+        log.info("Starting maximum-available ETF price update on application startup");
 
         String result = priceDataService.updateETFPriceDataFromLastDate();
 
@@ -90,7 +90,7 @@ public class StockPriceStartupUpdateRunner implements ApplicationRunner {
             return;
         }
 
-        log.info("Starting rolling two-year index price update on application startup");
+        log.info("Starting maximum-available index price update on application startup");
 
         String result = priceDataService.saveOrUpdateIndexPriceData(PriceFrequencey.DAILY);
 

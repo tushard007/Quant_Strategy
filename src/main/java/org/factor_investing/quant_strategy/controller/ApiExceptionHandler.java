@@ -39,4 +39,14 @@ public class ApiExceptionHandler {
         body.put("details", fieldErrors);
         return ResponseEntity.status(BAD_REQUEST).body(body);
     }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalArgumentException(IllegalArgumentException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", OffsetDateTime.now().toString());
+        body.put("status", BAD_REQUEST.value());
+        body.put("error", BAD_REQUEST.toString());
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(BAD_REQUEST).body(body);
+    }
 }

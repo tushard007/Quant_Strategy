@@ -8,21 +8,22 @@ import { ETFMasterComponent } from './etf-master/etf-master.component';
 import { IndexMasterComponent } from './index-master/index-master.component';
 import { MomentumAnalysisComponent } from './momentum-analysis/momentum-analysis.component';
 import { MomentumDashboardComponent } from './momentum-dashboard/momentum-dashboard.component';
-import { OhlcvExperimentComponent } from './ohlcv-experiment/ohlcv-experiment.component';
 import { TechnicalIndicatorComponent } from './technical-indicator/technical-indicator.component';
+import { MomentumBacktestComponent } from './momentum-backtest/momentum-backtest.component';
+import { MomentumRiskOverlayBacktestComponent } from './momentum-risk-overlay-backtest/momentum-risk-overlay-backtest.component';
 type TimeFrame = 'DAILY' | 'WEEKLY';
 type SourceKey = 'stock' | 'etf' | 'index';
 type AppTheme = 'forest' | 'ocean' | 'slate' | 'contrast';
 interface PriceSource { key: SourceKey; title: string; shortTitle: string; description: string; path: string; icon: string; }
 interface HistoryItem { id: number; sourceKey: SourceKey; title: string; timeFrame: TimeFrame; success: boolean; message: string; completedAt: Date; }
-@Component({ selector: 'app-root', imports: [FormsModule, DatePipe, StockMasterComponent, ETFMasterComponent, IndexMasterComponent, MomentumAnalysisComponent, MomentumDashboardComponent, OhlcvExperimentComponent, TechnicalIndicatorComponent], templateUrl: './app.html', styleUrl: './app.scss' })
+@Component({ selector: 'app-root', imports: [FormsModule, DatePipe, StockMasterComponent, ETFMasterComponent, IndexMasterComponent, MomentumAnalysisComponent, MomentumDashboardComponent, MomentumBacktestComponent, MomentumRiskOverlayBacktestComponent, TechnicalIndicatorComponent], templateUrl: './app.html', styleUrl: './app.scss' })
 export class App {
   private readonly http = inject(HttpClient);
   readonly timeFrame = signal<TimeFrame>('DAILY');
   readonly loading = signal<Record<SourceKey, boolean>>({ stock: false, etf: false, index: false });
   readonly history = signal<HistoryItem[]>([]);
   readonly notice = signal<{ type: 'success' | 'error'; message: string } | null>(null);
-  readonly activePage = signal<'dashboard' | 'price' | 'stocks' | 'etfs' | 'indexes' | 'momentum' | 'experiment' | 'technical-indicator'>('dashboard');
+  readonly activePage = signal<'dashboard' | 'price' | 'stocks' | 'etfs' | 'indexes' | 'momentum' | 'momentum-backtest' | 'momentum-risk-overlay' | 'technical-indicator'>('dashboard');
   readonly theme = signal<AppTheme>(this.savedTheme());
   readonly isAnyLoading = computed(() => Object.values(this.loading()).some(Boolean));
   readonly sources: PriceSource[] = [

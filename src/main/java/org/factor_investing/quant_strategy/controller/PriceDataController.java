@@ -37,11 +37,11 @@ public class PriceDataController {
     @Scheduled(cron = "0 0 16 * * MON-FRI", zone = "Asia/Kolkata")
     public void updateETFPriceData() throws ParseException {
         log.info("Starting scheduled at 4 PM IST (Weekdays only) for etf price update");
-        priceDataService.saveOrUpdateETFPriceData(PriceFrequencey.DAILY);
+        priceDataService.updateETFPriceDataFromLastDate();
     }
     @Scheduled(cron = "0 0 17 * * MON-FRI", zone = "Asia/Kolkata")
     public void updateStockPriceData() throws ParseException {
         log.info("Starting scheduled at 5 PM IST (Weekdays only) for stock price update");
-        priceDataService.saveOrUpdateStockPriceData(PriceFrequencey.DAILY);
+        priceDataService.updateStockPriceDataFromLastDate();
     }
 }

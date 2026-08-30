@@ -57,7 +57,10 @@ public class StockMomentumService {
 
     public List<SavedMomentumResult> getSavedResults(AssetDataType assetDataType, java.sql.Date strategyRunDate) {
         return topMomentumStockRepository.findByAssetDataTypeAndStrategyRunDateOrderByRank12MonthsAsc(assetDataType, strategyRunDate)
-                .stream().map(item -> new SavedMomentumResult(item.getStockName(), item.getPercentageReturn12Months(),
+                .stream()
+                .sorted(Comparator.comparingInt(TopN_MomentumAssetType::getTotalRankScore)
+                        .thenComparing(TopN_MomentumAssetType::getStockName))
+                .map(item -> new SavedMomentumResult(item.getStockName(), item.getPercentageReturn12Months(),
                         item.getPercentageReturn6Months(), item.getPercentageReturn3Months(), item.getStrategyRunDate(),
                         item.getRank12Months(), item.getRank6Months(), item.getRank3Months(), item.getTotalRankScore()))
                 .toList();
@@ -76,10 +79,18 @@ public class StockMomentumService {
         }
 
         assignRanks(assetDataType, calculationDate);
+        List<String> topStockNames = topMomentumStockRepository
+                .findByAssetDataTypeAndStrategyRunDateOrderByRank12MonthsAsc(
+                        assetDataType, java.sql.Date.valueOf(calculationDate)).stream()
+                .sorted(Comparator.comparingInt(TopN_MomentumAssetType::getTotalRankScore)
+                        .thenComparing(TopN_MomentumAssetType::getStockName))
+                .limit(MomentumConstants.ENTRY_RANK)
+                .map(TopN_MomentumAssetType::getStockName)
+                .toList();
         return new MomentumResult(
                 calculation.getAllStocks(),
                 calculation.getQualifiedStocks(),
-                calculation.getTopStockNames(),
+                topStockNames,
                 true,
                 "Momentum calculation and ranking completed successfully"
         );
@@ -160,9 +171,9 @@ public class StockMomentumService {
                     .filter(StockMomentum::isQualifiesForMomentum)
                     .collect(Collectors.toList());
 
-            // Get top stock names...TODO:modify after full implementation based on TotalRanking
+            // This provisional list is replaced with weighted-rank leaders by calculateAndRankMomentum.
             List<String> topStockNames = qualifiedStocks.stream()
-                    .limit(MomentumConstants.TOP_NUMBER_MOMENTUM_STOCKS)
+                    .limit(MomentumConstants.ENTRY_RANK)
                     .map(StockMomentum::getStockName)
                     .collect(Collectors.toList());
 
@@ -284,14 +295,10 @@ public class StockMomentumService {
                 TopN_MomentumAssetType::setRank3Months);
 
         // === WEIGHTED TOTAL RANK SCORE (higher weight on 3-month) ===
-        final int WEIGHT_12M = 1;
-        final int WEIGHT_6M  = 2;
-        final int WEIGHT_3M  = 3;
-
         momentumAssetList.forEach(stock -> {
-            int totalRank = stock.getRank12Months() * WEIGHT_12M
-                    + stock.getRank6Months()  * WEIGHT_6M
-                    + stock.getRank3Months()  * WEIGHT_3M;
+            int totalRank = stock.getRank12Months() * MomentumConstants.WEIGHT_12_MONTHS
+                    + stock.getRank6Months() * MomentumConstants.WEIGHT_6_MONTHS
+                    + stock.getRank3Months() * MomentumConstants.WEIGHT_3_MONTHS;
             stock.setTotalRankScore(totalRank);
         });
 

@@ -26,8 +26,10 @@ public class StockMomentum {
     }
 
     private boolean calculateQualification() {
-        return !Double.isNaN(threeMonthReturn) &&
+        return !Double.isNaN(oneYearReturn) &&
+                !Double.isNaN(threeMonthReturn) &&
                 !Double.isNaN(sixMonthReturn) &&
+                oneYearReturn > MomentumConstants.MINIMUM_RETURN_THRESHOLD &&
                 threeMonthReturn > MomentumConstants.MINIMUM_RETURN_THRESHOLD &&
                 sixMonthReturn > MomentumConstants.MINIMUM_RETURN_THRESHOLD;
     }

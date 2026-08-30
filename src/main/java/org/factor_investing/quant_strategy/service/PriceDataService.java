@@ -4,6 +4,7 @@ import com.upstox.api.GetHistoricalCandleResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.factor_investing.quant_strategy.model.*;
 import org.factor_investing.quant_strategy.model.response.JGetHistoricalCandleResponse;
+import org.factor_investing.quant_strategy.model.event.PriceDataChangedEvent;
 import org.factor_investing.quant_strategy.repository.ETFPriceDataRepository;
 import org.factor_investing.quant_strategy.repository.IndexPriceDataRepository;
 import org.factor_investing.quant_strategy.repository.NSEIndexMasterDataRepository;
@@ -11,6 +12,7 @@ import org.factor_investing.quant_strategy.repository.StockDataRepository;
 import org.factor_investing.quant_strategy.strategies.OHLCV;
 import org.factor_investing.quant_strategy.util.DateUtil;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.text.ParseException;
 import java.time.LocalDate;
@@ -32,12 +34,18 @@ import java.util.stream.Collectors;
 @Slf4j
 public class PriceDataService {
 
+    /** Upstox V3 daily/weekly/monthly historical availability begins in January 2000. */
+    private static final LocalDate MAXIMUM_HISTORY_START_DATE = LocalDate.of(2000, 1, 1);
+    /** A single V3 daily request may cover at most one decade. */
+    private static final int DAILY_REQUEST_MAX_YEARS = 10;
+
     private final StockDataRepository stockPriceDataRepository;
     private final ETFPriceDataRepository etfPriceDataRepository;
     private final IndexPriceDataRepository indexPriceDataRepository;
     private final NSEIndexMasterDataRepository nseIndexMasterDataRepository;
     private final NSE_StockDataService nseStockDataService;
     private final UpstoxHistoricalDataService upstoxHistoricalDataService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public PriceDataService(
             StockDataRepository stockPriceDataRepository,
@@ -45,7 +53,8 @@ public class PriceDataService {
             IndexPriceDataRepository indexPriceDataRepository,
             NSEIndexMasterDataRepository nseIndexMasterDataRepository,
             NSE_StockDataService nseStockDataService,
-            UpstoxHistoricalDataService upstoxHistoricalDataService
+            UpstoxHistoricalDataService upstoxHistoricalDataService,
+            ApplicationEventPublisher eventPublisher
     ) {
         this.stockPriceDataRepository = stockPriceDataRepository;
         this.etfPriceDataRepository = etfPriceDataRepository;
@@ -53,6 +62,7 @@ public class PriceDataService {
         this.nseIndexMasterDataRepository = nseIndexMasterDataRepository;
         this.nseStockDataService = nseStockDataService;
         this.upstoxHistoricalDataService = upstoxHistoricalDataService;
+        this.eventPublisher = eventPublisher;
     }
 
     public String saveOrUpdateStockPriceData(PriceFrequencey timeFrame) throws ParseException {
@@ -66,8 +76,7 @@ public class PriceDataService {
 
         String toDate = currentDate.format(formatter);
 
-        LocalDate beforeYearDate = DateUtil.getDateBeforeYear(currentDate, 2);
-        beforeYearDate = DateUtil.getFridayDateIfWeekend(beforeYearDate);
+        LocalDate beforeYearDate = MAXIMUM_HISTORY_START_DATE;
 
         String fromDate = beforeYearDate.format(formatter);
 
@@ -219,6 +228,7 @@ public class PriceDataService {
         }
 
         stockPriceDataRepository.saveAll(toSave);
+        publishPriceDataChanged(AssetDataType.STOCK);
 
         log.info("Created stock price data list with {} entries.", toSave.size()
         );
@@ -236,8 +246,7 @@ public class PriceDataService {
 
         String interval = "days";
 
-        LocalDate historyStartDate = DateUtil.getFridayDateIfWeekend(
-                DateUtil.getDateBeforeYear(currentDate, 2));
+        LocalDate historyStartDate = MAXIMUM_HISTORY_START_DATE;
 
         List<StockPricesJson> existingList =
                 stockPriceDataRepository.findAll();
@@ -287,26 +296,21 @@ public class PriceDataService {
             Optional<LocalDate> lastPriceDate =
                     getLastPriceDate(stockPricesJson);
 
-            Optional<LocalDate> firstPriceDate =
-                    getFirstPriceDate(stockPricesJson);
-
             if (lastPriceDate.isPresent()
-                    && !lastPriceDate.get().isBefore(currentDate)
-                    && firstPriceDate.isPresent()
-                    && !firstPriceDate.get().isAfter(historyStartDate)) {
+                    && !lastPriceDate.get().isBefore(currentDate)) {
 
                 skippedCount++;
 
                 continue;
             }
 
-            String fromDate =
-                    historyStartDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            String fromDate = lastPriceDate.map(date -> date.plusDays(1))
+                    .orElse(historyStartDate).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
 
             String instrumentKey = "NSE_EQ|" + stockData.getIsinNumber();
 
             log.info(
-                    "Fetching rolling two-year stock price update for stock: {} from {} to {} ({}/{})",
+                    "Fetching incremental stock price update for stock: {} from {} to {} ({}/{})",
                     stockData.getNameOfCompany(),
                     fromDate,
                     toDate,
@@ -390,6 +394,7 @@ public class PriceDataService {
         if (!toSave.isEmpty()) {
 
             stockPriceDataRepository.saveAll(toSave);
+            publishPriceDataChanged(AssetDataType.STOCK);
         }
 
         log.info(
@@ -414,8 +419,7 @@ public class PriceDataService {
 
         String interval = "days";
 
-        LocalDate historyStartDate = DateUtil.getFridayDateIfWeekend(
-                DateUtil.getDateBeforeYear(currentDate, 2));
+        LocalDate historyStartDate = MAXIMUM_HISTORY_START_DATE;
 
         List<ETFPricesJson> existingList =
                 etfPriceDataRepository.findAll();
@@ -465,26 +469,21 @@ public class PriceDataService {
             Optional<LocalDate> lastPriceDate =
                     getLastPriceDate(etfPricesJson);
 
-            Optional<LocalDate> firstPriceDate =
-                    getFirstPriceDate(etfPricesJson);
-
             if (lastPriceDate.isPresent()
-                    && !lastPriceDate.get().isBefore(currentDate)
-                    && firstPriceDate.isPresent()
-                    && !firstPriceDate.get().isAfter(historyStartDate)) {
+                    && !lastPriceDate.get().isBefore(currentDate)) {
 
                 skippedCount++;
 
                 continue;
             }
 
-            String fromDate =
-                    historyStartDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            String fromDate = lastPriceDate.map(date -> date.plusDays(1))
+                    .orElse(historyStartDate).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
 
             String instrumentKey = "NSE_EQ|" + indexData.getIsinNumber();
 
             log.info(
-                    "Fetching rolling two-year ETF price update for ETF: {} from {} to {} ({}/{})",
+                    "Fetching incremental ETF price update for ETF: {} from {} to {} ({}/{})",
                     indexData.getSecurityName(),
                     fromDate,
                     toDate,
@@ -568,6 +567,7 @@ public class PriceDataService {
         if (!toSave.isEmpty()) {
 
             etfPriceDataRepository.saveAll(toSave);
+            publishPriceDataChanged(AssetDataType.ETF);
         }
 
         log.info(
@@ -601,8 +601,7 @@ public class PriceDataService {
 
         String toDate = currentDate.format(formatter);
 
-        LocalDate beforeTwoYearDate =
-                DateUtil.getFridayDateIfWeekend(DateUtil.getDateBeforeYear(currentDate, 2));
+        LocalDate beforeTwoYearDate = MAXIMUM_HISTORY_START_DATE;
 
         String fromDate = beforeTwoYearDate.format(formatter);
 
@@ -694,6 +693,7 @@ public class PriceDataService {
         if (!toSave.isEmpty()) {
 
             indexPriceDataRepository.saveAll(toSave);
+            publishPriceDataChanged(AssetDataType.INDEX);
         }
 
         log.info("Created index price data list with {} entries.", toSave.size());
@@ -733,10 +733,10 @@ public class PriceDataService {
                     .toList();
         }
 
-        boolean updatedTillCurrentTradingDate = coversRollingTwoYearWindow(priceSeries, currentDate);
+        boolean updatedTillCurrentTradingDate = coversCurrentTradingDate(priceSeries, currentDate);
 
         log.info(
-                "{} price data covers the rolling two-year window ending {}: {}",
+                "{} price data is updated through current trading date {}: {}",
                 assetDataType,
                 currentDate,
                 updatedTillCurrentTradingDate
@@ -807,34 +807,17 @@ public class PriceDataService {
                 .min(Comparator.naturalOrder());
     }
 
-    private boolean coversRollingTwoYearWindow(List<List<OHLCV>> priceSeries, LocalDate currentDate) {
-        LocalDate requiredStartDate = DateUtil.getFridayDateIfWeekend(
-                DateUtil.getDateBeforeYear(currentDate, 2));
-        LocalDate earliestDate = null;
-        LocalDate latestDate = null;
-
+    private boolean coversCurrentTradingDate(List<List<OHLCV>> priceSeries, LocalDate currentDate) {
+        boolean foundSeries = false;
         for (List<OHLCV> prices : priceSeries) {
-            if (prices == null) {
-                continue;
-            }
-            for (OHLCV price : prices) {
-                if (price == null || price.getDate() == null) {
-                    continue;
-                }
-                LocalDate priceDate = DateUtil.convertDateToLocalDate(price.getDate());
-                if (earliestDate == null || priceDate.isBefore(earliestDate)) {
-                    earliestDate = priceDate;
-                }
-                if (latestDate == null || priceDate.isAfter(latestDate)) {
-                    latestDate = priceDate;
-                }
-            }
+            if (prices == null || prices.isEmpty()) return false;
+            Optional<LocalDate> latestDate = prices.stream().filter(Objects::nonNull)
+                    .map(OHLCV::getDate).filter(Objects::nonNull)
+                    .map(DateUtil::convertDateToLocalDate).max(Comparator.naturalOrder());
+            if (latestDate.isEmpty() || latestDate.get().isBefore(currentDate)) return false;
+            foundSeries = true;
         }
-
-        return earliestDate != null
-                && latestDate != null
-                && !earliestDate.isAfter(requiredStartDate)
-                && !latestDate.isBefore(currentDate);
+        return foundSeries;
     }
 
     private Optional<LocalDate> getLatestUpdatedOnDate(List<StockPricesJson> stockPricesJsonList) {
@@ -948,7 +931,10 @@ public class PriceDataService {
                     record.getTimeFrame(), size(record.getOhlcvData()), normalized.size());
             record.setOhlcvData(normalized); return true;
         }).toList();
-        if (!changed.isEmpty()) stockPriceDataRepository.saveAll(changed);
+        if (!changed.isEmpty()) {
+            stockPriceDataRepository.saveAll(changed);
+            publishPriceDataChanged(AssetDataType.STOCK);
+        }
     }
 
     private void sanitizeStoredETFPrices(List<ETFPricesJson> records) {
@@ -960,7 +946,10 @@ public class PriceDataService {
                     record.getTimeFrame(), size(record.getOhlcvData()), normalized.size());
             record.setOhlcvData(normalized); return true;
         }).toList();
-        if (!changed.isEmpty()) etfPriceDataRepository.saveAll(changed);
+        if (!changed.isEmpty()) {
+            etfPriceDataRepository.saveAll(changed);
+            publishPriceDataChanged(AssetDataType.ETF);
+        }
     }
 
     private void sanitizeStoredIndexPrices(List<IndexPricesJson> records) {
@@ -972,7 +961,10 @@ public class PriceDataService {
                     record.getTimeFrame(), size(record.getOhlcvData()), normalized.size());
             record.setOhlcvData(normalized); return true;
         }).toList();
-        if (!changed.isEmpty()) indexPriceDataRepository.saveAll(changed);
+        if (!changed.isEmpty()) {
+            indexPriceDataRepository.saveAll(changed);
+            publishPriceDataChanged(AssetDataType.INDEX);
+        }
     }
 
     List<OHLCV> normalizeOhlcvData(List<OHLCV> source) {
@@ -996,6 +988,10 @@ public class PriceDataService {
 
     private int size(List<OHLCV> rows) { return rows == null ? 0 : rows.size(); }
 
+    private void publishPriceDataChanged(AssetDataType assetDataType) {
+        if (eventPublisher != null) eventPublisher.publishEvent(new PriceDataChangedEvent(assetDataType));
+    }
+
     /*
      * Retry implementation with exponential backoff
      */
@@ -1005,14 +1001,38 @@ public class PriceDataService {
             String toDate,
             String fromDate
     ) {
+        LocalDate requestedFrom = LocalDate.parse(fromDate);
+        LocalDate requestedTo = LocalDate.parse(toDate);
+        if (!"days".equals(interval) || requestedTo.isBefore(requestedFrom.plusYears(DAILY_REQUEST_MAX_YEARS))) {
+            return fetchSingleHistoricalRangeWithRetry(instrumentKey, interval, toDate, fromDate);
+        }
+
+        GetHistoricalCandleResponse combined = null;
+        LocalDate chunkFrom = requestedFrom;
+        while (!chunkFrom.isAfter(requestedTo)) {
+            LocalDate chunkTo = chunkFrom.plusYears(DAILY_REQUEST_MAX_YEARS).minusDays(1);
+            if (chunkTo.isAfter(requestedTo)) chunkTo = requestedTo;
+            log.info("Fetching Upstox daily history chunk for instrument={} from {} to {}",
+                    instrumentKey, chunkFrom, chunkTo);
+            GetHistoricalCandleResponse chunk = fetchSingleHistoricalRangeWithRetry(instrumentKey, interval,
+                    chunkTo.toString(), chunkFrom.toString());
+            if (chunk != null && chunk.getData() != null && chunk.getData().getCandles() != null) {
+                if (combined == null) combined = chunk;
+                else combined.getData().getCandles().addAll(chunk.getData().getCandles());
+            }
+            chunkFrom = chunkTo.plusDays(1);
+            if (!chunkFrom.isAfter(requestedTo)) pauseBetweenHistoryChunks();
+        }
+        return combined;
+    }
+
+    private GetHistoricalCandleResponse fetchSingleHistoricalRangeWithRetry(
+            String instrumentKey, String interval, String toDate, String fromDate) {
 
         int maxRetries = 5;
-
-        int retry = 0;
-
-        while (retry < maxRetries) {
+        for (int retry = 0; retry < maxRetries; retry++) {
             try {
-                return upstoxHistoricalDataService
+                GetHistoricalCandleResponse response = upstoxHistoricalDataService
                         .getHistoricalCandleData(
                                 instrumentKey,
                                 interval,
@@ -1020,16 +1040,31 @@ public class PriceDataService {
                                 toDate,
                                 fromDate
                         );
-
+                if (response != null) return response;
             } catch (Exception e) {
-                log.error("Unexpected exception for instrument={}", instrumentKey, e);
-                return null;
+                log.warn("Historical request attempt {} failed for instrument={} from {} to {}",
+                        retry + 1, instrumentKey, fromDate, toDate, e);
             }
+            if (retry + 1 < maxRetries) pauseBeforeRetry(retry);
         }
-
-        log.error("Max retries exceeded for instrument={}", instrumentKey);
-
+        log.error("Max retries exceeded for instrument={} from {} to {}", instrumentKey, fromDate, toDate);
         return null;
+    }
+
+    private void pauseBeforeRetry(int retry) {
+        try {
+            Thread.sleep(Math.min(4_000L, 500L * (1L << retry)));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void pauseBetweenHistoryChunks() {
+        try {
+            Thread.sleep(250);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     public String saveOrUpdateETFPriceData(PriceFrequencey timeFrame)
@@ -1046,9 +1081,7 @@ public class PriceDataService {
 
         String toDate = currentDate.format(formatter);
 
-        LocalDate beforeYearDate = DateUtil.getDateBeforeYear(currentDate, 2);
-
-        beforeYearDate = DateUtil.getFridayDateIfWeekend(beforeYearDate);
+        LocalDate beforeYearDate = MAXIMUM_HISTORY_START_DATE;
 
         String fromDate = beforeYearDate.format(formatter);
 
@@ -1219,6 +1252,7 @@ public class PriceDataService {
         }
 
         etfPriceDataRepository.saveAll(toSave);
+        publishPriceDataChanged(AssetDataType.ETF);
 
         log.info(
                 "Created ETF price data list with {} entries.",

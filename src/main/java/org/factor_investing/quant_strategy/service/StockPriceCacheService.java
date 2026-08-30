@@ -5,6 +5,7 @@ import org.factor_investing.quant_strategy.model.AssetDataType;
 import org.factor_investing.quant_strategy.model.ETFPricesJson;
 import org.factor_investing.quant_strategy.model.IndexPricesJson;
 import org.factor_investing.quant_strategy.model.StockPricesJson;
+import org.factor_investing.quant_strategy.model.event.PriceDataChangedEvent;
 import org.factor_investing.quant_strategy.strategies.OHLCV;
 import org.factor_investing.quant_strategy.util.DateUtil;
 import org.springframework.boot.context.event.ApplicationStartedEvent;
@@ -150,6 +151,17 @@ public class StockPriceCacheService {
 
     // Set cache validity for 5 minutes.
     private static final long CACHE_DURATION_MS = TimeUnit.MINUTES.toMillis(60);
+
+    @EventListener
+    public void refreshChangedPriceCache(PriceDataChangedEvent event) {
+        if (event == null || event.assetDataType() == null) return;
+        switch (event.assetDataType()) {
+            case STOCK -> refreshStockPriceDataCache();
+            case ETF -> refreshETFPriceDataCache();
+            case INDEX -> refreshIndexPriceDataCache();
+        }
+        log.info("Refreshed {} price cache immediately after database change", event.assetDataType());
+    }
 
 
     /**

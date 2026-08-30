@@ -43,6 +43,13 @@ class StockMomentumServiceTest {
         assertThat(service.calculateStockMomentum("TEST", bars(LocalDate.of(2025, 1, 1), 252), LocalDate.of(2026, 1, 1))).isNull();
     }
 
+    @Test
+    void doesNotQualifyNegativeTwelveMonthMomentumWithPositiveSixAndThreeMonthMomentum() {
+        StockMomentum momentum = new StockMomentum("RECOVERY", -10.0f, 15.0f, 8.0f, LocalDate.of(2026, 1, 1));
+
+        assertThat(momentum.isQualifiesForMomentum()).isFalse();
+    }
+
     private List<OHLCV> bars(LocalDate start, int count) {
         List<OHLCV> result = new ArrayList<>();
         for (int index = 0; index < count; index++) {
