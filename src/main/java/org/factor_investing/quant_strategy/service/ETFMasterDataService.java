@@ -4,6 +4,7 @@ import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
 import org.factor_investing.quant_strategy.model.NSE_ETFMasterData;
 import org.factor_investing.quant_strategy.model.request.ETFMasterRequest;
+import org.factor_investing.quant_strategy.model.request.ETFCommoditySelectionRequest;
 import org.factor_investing.quant_strategy.model.response.ETFMasterImportResponse;
 import org.factor_investing.quant_strategy.repository.NSE_ETFMasterDataRepository;
 import org.springframework.stereotype.Service;
@@ -57,6 +58,18 @@ public class ETFMasterDataService {
     public void delete(Long id) { repository.delete(requireById(id)); }
 
     @Transactional
+    public List<NSE_ETFMasterData> updateCommoditySelection(ETFCommoditySelectionRequest request) {
+        if (!request.scopeIds().containsAll(request.selectedIds()))
+            throw new ResponseStatusException(BAD_REQUEST, "Selected ETF IDs must be part of the displayed ETF selection");
+        List<NSE_ETFMasterData> scoped = repository.findAllById(request.scopeIds());
+        if (scoped.size() != request.scopeIds().size())
+            throw new ResponseStatusException(NOT_FOUND, "One or more ETF master records were not found");
+        scoped.forEach(etf -> etf.setIsCommodity(request.selectedIds().contains(etf.getId())));
+        return repository.saveAll(scoped).stream()
+                .sorted((a,b)->a.getSymbol().compareToIgnoreCase(b.getSymbol())).toList();
+    }
+
+    @Transactional
     public ETFMasterImportResponse replaceFromCsv(MultipartFile file) {
         if (file == null || file.isEmpty()) throw csvError("Please select a non-empty CSV file");
         List<ETFMasterRequest> rows = parseCsv(file);
@@ -92,14 +105,14 @@ public class ETFMasterDataService {
                 try {
                     int marketLot = Integer.parseInt(values[4].trim()); double faceValue = Double.parseDouble(values[6].trim());
                     if (marketLot <= 0 || faceValue < 0) throw new NumberFormatException();
-                    rows.add(new ETFMasterRequest(symbol, values[1].trim(), values[2].trim(), values[3].trim(), marketLot, normalize(values[5]), faceValue));
+                    rows.add(new ETFMasterRequest(symbol, values[1].trim(), values[2].trim(), values[3].trim(), marketLot, normalize(values[5]), faceValue, null));
                 } catch (NumberFormatException exception) { throw csvError("Row " + row + " contains an invalid Market Lot or Face Value"); }
             }
             if (rows.isEmpty()) throw csvError("CSV must contain at least one data row"); return rows;
         } catch (IOException | CsvValidationException exception) { throw csvError("CSV file could not be read: " + exception.getMessage()); }
     }
 
-    private NSE_ETFMasterData apply(NSE_ETFMasterData etf, ETFMasterRequest request) { etf.setSymbol(normalize(request.symbol())); etf.setUnderlying(request.underlying().trim()); etf.setSecurityName(request.securityName().trim()); etf.setDateOfListing(request.dateOfListing().trim()); etf.setMarketLot(request.marketLot()); etf.setIsinNumber(normalize(request.isinNumber())); etf.setFaceValue(request.faceValue()); return etf; }
+    private NSE_ETFMasterData apply(NSE_ETFMasterData etf, ETFMasterRequest request) { etf.setSymbol(normalize(request.symbol())); etf.setUnderlying(request.underlying().trim()); etf.setSecurityName(request.securityName().trim()); etf.setDateOfListing(request.dateOfListing().trim()); etf.setMarketLot(request.marketLot()); etf.setIsinNumber(normalize(request.isinNumber())); etf.setFaceValue(request.faceValue()); if(request.isCommodity()!=null)etf.setIsCommodity(request.isCommodity()); return etf; }
     private String normalize(String value) { return value.trim().toUpperCase(); }
     private boolean contains(String value, String term) { return value != null && value.toLowerCase().contains(term); }
     private ResponseStatusException csvError(String message) { return new ResponseStatusException(BAD_REQUEST, message); }

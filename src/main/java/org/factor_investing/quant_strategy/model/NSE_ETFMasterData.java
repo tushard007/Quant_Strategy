@@ -33,4 +33,7 @@ public class NSE_ETFMasterData {
 
     // Face value of the ETF
     private Double faceValue;
+
+    @Column(name = "is_commodity", nullable = false)
+    private Boolean isCommodity = false;
 }

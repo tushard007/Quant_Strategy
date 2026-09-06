@@ -1,14 +1,19 @@
 @use '../stock-master/stock-master.component.scss';
 
-table { table-layout: fixed; min-width: 850px; }
-th:nth-child(1), td:nth-child(1) { width: 13%; }
-th:nth-child(2), td:nth-child(2) { width: 25%; }
-th:nth-child(3), td:nth-child(3) { width: 23%; }
-th:nth-child(4), td:nth-child(4) { width: 13%; white-space: nowrap; }
-th:nth-child(5), td:nth-child(5) { width: 15%; }
-th:nth-child(6), td:nth-child(6) { width: 11%; }
+table { table-layout: fixed; min-width: 980px; }
+th:nth-child(1), td:nth-child(1) { width: 11%; }
+th:nth-child(2), td:nth-child(2) { width: 21%; }
+th:nth-child(3), td:nth-child(3) { width: 19%; }
+th:nth-child(4), td:nth-child(4) { width: 12%; }
+th:nth-child(5), td:nth-child(5) { width: 12%; white-space: nowrap; }
+th:nth-child(6), td:nth-child(6) { width: 14%; }
+th:nth-child(7), td:nth-child(7) { width: 11%; }
 td { overflow: hidden; text-overflow: ellipsis; }
-td:nth-child(2), td:nth-child(3) { white-space: normal; line-height: 1.35; }
+td:nth-child(2), td:nth-child(3), td:nth-child(4) { white-space: normal; line-height: 1.35; }
+.commodity-select { display: inline-flex; flex-direction: row; align-items: center; gap: 7px; margin: 0; font-size: 12px; cursor: pointer; }
+.commodity-select input { width: 16px; height: 16px; margin: 0; accent-color: #2563eb; }
+.save-commodities { border: 0; border-radius: 8px; padding: 9px 13px; background: #2563eb; color: #fff; font-weight: 700; cursor: pointer; }
+.save-commodities:disabled { opacity: .55; cursor: not-allowed; }
 td code { font-size: 11px; white-space: nowrap; }
 .actions { gap: 5px; }
 .actions button { padding: 5px 7px; font-size: 11px; }

@@ -13,6 +13,7 @@ public record ETFMasterRequest(
         @NotBlank @Size(max = 30) String dateOfListing,
         @NotNull @Positive Integer marketLot,
         @NotBlank @Size(max = 20) String isinNumber,
-        @NotNull @PositiveOrZero Double faceValue
+        @NotNull @PositiveOrZero Double faceValue,
+        Boolean isCommodity
 ) {
 }
