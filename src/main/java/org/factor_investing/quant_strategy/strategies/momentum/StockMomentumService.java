@@ -2,6 +2,7 @@ package org.factor_investing.quant_strategy.strategies.momentum;
 
 import lombok.extern.slf4j.Slf4j;
 import org.factor_investing.quant_strategy.model.AssetDataType;
+import org.factor_investing.quant_strategy.model.NiftyIndexName;
 import org.factor_investing.quant_strategy.model.TopN_MomentumAssetType;
 import org.factor_investing.quant_strategy.model.response.MomentumExecutionSummary;
 import org.factor_investing.quant_strategy.model.response.SavedMomentumResult;
@@ -72,8 +73,14 @@ public class StockMomentumService {
      */
     @Transactional
     public MomentumResult calculateAndRankMomentum(AssetDataType assetDataType, LocalDate asOfDate) {
+        return calculateAndRankMomentum(assetDataType, asOfDate, null, null);
+    }
+
+    @Transactional
+    public MomentumResult calculateAndRankMomentum(AssetDataType assetDataType, LocalDate asOfDate,
+                                                    Collection<String> stockSymbols, NiftyIndexName niftyIndex) {
         LocalDate calculationDate = asOfDate == null ? LocalDate.now(MARKET_TIME_ZONE) : asOfDate;
-        MomentumResult calculation = calculateMomentum(assetDataType, calculationDate);
+        MomentumResult calculation = calculateMomentum(assetDataType, calculationDate, stockSymbols);
         if (!calculation.isValid()) {
             return calculation;
         }
@@ -92,7 +99,9 @@ public class StockMomentumService {
                 calculation.getQualifiedStocks(),
                 topStockNames,
                 true,
-                "Momentum calculation and ranking completed successfully"
+                niftyIndex == null
+                        ? "Momentum calculation and ranking completed successfully"
+                        : "Momentum calculation and ranking completed for " + niftyIndex.name()
         );
     }
 
@@ -102,6 +111,11 @@ public class StockMomentumService {
      * @return MomentumResult containing all calculation results
      */
     public MomentumResult calculateMomentum(AssetDataType assetDataType, LocalDate asOfDate) {
+        return calculateMomentum(assetDataType, asOfDate, null);
+    }
+
+    public MomentumResult calculateMomentum(AssetDataType assetDataType, LocalDate asOfDate,
+                                            Collection<String> stockSymbols) {
         try {
             if (asOfDate.isAfter(LocalDate.now(MARKET_TIME_ZONE))) {
                 throw new IllegalArgumentException("As-of date cannot be in the future");
@@ -110,6 +124,22 @@ public class StockMomentumService {
             Map<String, List<OHLCV>> stockData = null;
             if (AssetDataType.STOCK == assetDataType) {
                 stockData = stockPriceCacheService.getCachedAllStockPriceData();
+                if (stockSymbols != null) {
+                    Set<String> universe = stockSymbols.stream()
+                            .filter(Objects::nonNull)
+                            .map(symbol -> symbol.trim().toUpperCase(Locale.ROOT))
+                            .collect(Collectors.toSet());
+                    if (universe.isEmpty()) {
+                        throw new IllegalArgumentException("The selected Nifty index does not contain any stocks");
+                    }
+                    stockData = stockData.entrySet().stream()
+                            .filter(entry -> universe.contains(entry.getKey().trim().toUpperCase(Locale.ROOT)))
+                            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+                    if (stockData.isEmpty()) {
+                        throw new IllegalArgumentException("No price data is available for stocks in the selected Nifty index");
+                    }
+                    log.info("Restricted stock momentum universe to {} cached constituents", stockData.size());
+                }
             }
             if (AssetDataType.ETF == assetDataType) {
                 stockData = stockPriceCacheService.getCachedAllETFPriceData();

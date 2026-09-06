@@ -33,12 +33,23 @@ public class MomentumBacktestService {
                                       double riskFreeRatePercent, String rebalanceMode,
                                       double bufferAmount, double maximumLeverageAmount,
                                       double borrowingInterestRatePercent) {
+        return run(startDate, endDate, initialCapital, entryRank, retentionRank, benchmark,
+                transactionCostPercent, slippagePercent, riskFreeRatePercent, rebalanceMode,
+                bufferAmount, maximumLeverageAmount, borrowingInterestRatePercent, null);
+    }
+
+    public MomentumBacktestResult run(LocalDate startDate, LocalDate endDate, double initialCapital,
+                                      int entryRank, int retentionRank, String benchmark,
+                                      double transactionCostPercent, double slippagePercent,
+                                      double riskFreeRatePercent, String rebalanceMode,
+                                      double bufferAmount, double maximumLeverageAmount,
+                                      double borrowingInterestRatePercent, Collection<String> stockSymbols) {
         MomentumBacktestResult base = runCore(startDate, endDate, initialCapital, entryRank, retentionRank,
                 benchmark, transactionCostPercent, slippagePercent, riskFreeRatePercent, rebalanceMode,
-                bufferAmount, maximumLeverageAmount, borrowingInterestRatePercent);
+                bufferAmount, maximumLeverageAmount, borrowingInterestRatePercent, stockSymbols);
         return addDiagnostics(base, entryRank, retentionRank, benchmark, transactionCostPercent,
                 slippagePercent, riskFreeRatePercent, rebalanceMode, bufferAmount,
-                maximumLeverageAmount, borrowingInterestRatePercent);
+                maximumLeverageAmount, borrowingInterestRatePercent, stockSymbols);
     }
 
     MomentumBacktestResult runCore(LocalDate startDate, LocalDate endDate, double initialCapital,
@@ -47,6 +58,17 @@ public class MomentumBacktestService {
                                       double riskFreeRatePercent, String rebalanceMode,
                                       double bufferAmount, double maximumLeverageAmount,
                                       double borrowingInterestRatePercent) {
+        return runCore(startDate, endDate, initialCapital, entryRank, retentionRank, benchmark,
+                transactionCostPercent, slippagePercent, riskFreeRatePercent, rebalanceMode,
+                bufferAmount, maximumLeverageAmount, borrowingInterestRatePercent, null);
+    }
+
+    MomentumBacktestResult runCore(LocalDate startDate, LocalDate endDate, double initialCapital,
+                                      int entryRank, int retentionRank, String benchmark,
+                                      double transactionCostPercent, double slippagePercent,
+                                      double riskFreeRatePercent, String rebalanceMode,
+                                      double bufferAmount, double maximumLeverageAmount,
+                                      double borrowingInterestRatePercent, Collection<String> stockSymbols) {
         validate(startDate, endDate, initialCapital, entryRank, retentionRank, transactionCostPercent, slippagePercent);
         if (riskFreeRatePercent < 0 || riskFreeRatePercent > 100)
             throw new IllegalArgumentException("Risk-free rate must be between 0 and 100 percent");
@@ -56,8 +78,16 @@ public class MomentumBacktestService {
         if(bufferAmount<0||maximumLeverageAmount<0||borrowingInterestRatePercent<0)
             throw new IllegalArgumentException("Buffer, leverage and borrowing interest cannot be negative");
         Map<String, NavigableMap<LocalDate, OHLCV>> stocks = normalize(cacheService.getCachedAllStockPriceData());
+        if (stockSymbols != null) {
+            Set<String> universe = stockSymbols.stream().filter(Objects::nonNull)
+                    .map(symbol -> symbol.trim().toUpperCase(Locale.ROOT)).collect(Collectors.toSet());
+            if (universe.isEmpty()) throw new IllegalArgumentException("The selected Nifty index does not contain any stocks");
+            stocks.entrySet().removeIf(entry -> !universe.contains(entry.getKey().trim().toUpperCase(Locale.ROOT)));
+        }
         Map<String, NavigableMap<LocalDate, OHLCV>> indexes = normalize(cacheService.getCachedAllIndexPriceData());
-        if (stocks.isEmpty()) throw new IllegalArgumentException("No cached stock price data is available");
+        if (stocks.isEmpty()) throw new IllegalArgumentException(stockSymbols == null
+                ? "No cached stock price data is available"
+                : "No cached stock price data is available for the selected Nifty index");
         NavigableMap<LocalDate, OHLCV> benchmarkPrices = resolveBenchmark(indexes, benchmark);
         List<LocalDate> signals = monthlySignals(stocks, startDate, endDate);
         if (signals.size() < 2) throw new IllegalArgumentException("The selected range needs at least two monthly signal dates");
@@ -232,13 +262,14 @@ public class MomentumBacktestService {
     private MomentumBacktestResult addDiagnostics(MomentumBacktestResult base, int entryRank, int retentionRank,
             String benchmark, double transactionCostPercent, double slippagePercent,
             double riskFreeRatePercent, String rebalanceMode, double bufferAmount,
-            double maximumLeverageAmount, double borrowingInterestRatePercent) {
+            double maximumLeverageAmount, double borrowingInterestRatePercent,
+            Collection<String> stockSymbols) {
         List<MomentumBacktestResult.ParameterStability> stability = parameterStability(base, entryRank,
                 retentionRank, benchmark, transactionCostPercent, slippagePercent, riskFreeRatePercent,
-                rebalanceMode, bufferAmount, maximumLeverageAmount, borrowingInterestRatePercent);
+                rebalanceMode, bufferAmount, maximumLeverageAmount, borrowingInterestRatePercent, stockSymbols);
         List<MomentumBacktestResult.WalkForwardWindow> walkForward = walkForward(base, stability, benchmark,
                 transactionCostPercent, slippagePercent, riskFreeRatePercent, rebalanceMode,
-                bufferAmount, maximumLeverageAmount, borrowingInterestRatePercent);
+                bufferAmount, maximumLeverageAmount, borrowingInterestRatePercent, stockSymbols);
         return new MomentumBacktestResult(base.startDate(), base.endDate(), base.initialCapital(), base.finalValue(),
                 base.totalReturn(), base.cagr(), base.maximumDrawdown(), base.benchmark(),
                 base.benchmarkFinalValue(), base.benchmarkReturn(), base.benchmarkCagr(),
@@ -330,13 +361,14 @@ public class MomentumBacktestService {
     private List<MomentumBacktestResult.ParameterStability> parameterStability(MomentumBacktestResult base,
             int entryRank, int retentionRank, String benchmark, double transactionCostPercent,
             double slippagePercent, double riskFreeRatePercent, String rebalanceMode,
-            double bufferAmount, double maximumLeverageAmount, double borrowingInterestRatePercent) {
+            double bufferAmount, double maximumLeverageAmount, double borrowingInterestRatePercent,
+            Collection<String> stockSymbols) {
         List<MomentumBacktestResult.ParameterStability> rows = new ArrayList<>();
         for (int[] pair : parameterPairs(entryRank, retentionRank)) {
             MomentumBacktestResult run = pair[0] == entryRank && pair[1] == retentionRank ? base
                     : runCore(base.startDate(), base.endDate(), base.initialCapital(), pair[0], pair[1], benchmark,
                     transactionCostPercent, slippagePercent, riskFreeRatePercent, rebalanceMode,
-                    bufferAmount, maximumLeverageAmount, borrowingInterestRatePercent);
+                    bufferAmount, maximumLeverageAmount, borrowingInterestRatePercent, stockSymbols);
             double turnover = run.rebalances().stream().mapToDouble(MomentumBacktestResult.Rebalance::turnoverPercent).sum();
             rows.add(new MomentumBacktestResult.ParameterStability(pair[0], pair[1], run.totalReturn(),
                     run.cagr(), run.maximumDrawdown(), run.sharpeRatio(), turnover, run.totalCosts()));
@@ -348,7 +380,7 @@ public class MomentumBacktestService {
             List<MomentumBacktestResult.ParameterStability> stability, String benchmark,
             double transactionCostPercent, double slippagePercent, double riskFreeRatePercent,
             String rebalanceMode, double bufferAmount, double maximumLeverageAmount,
-            double borrowingInterestRatePercent) {
+            double borrowingInterestRatePercent, Collection<String> stockSymbols) {
         List<MomentumBacktestResult.WalkForwardWindow> rows = new ArrayList<>();
         LocalDate testStart = base.startDate().plusYears(2);
         while (testStart.isBefore(base.endDate().minusMonths(2))) {
@@ -360,7 +392,7 @@ public class MomentumBacktestService {
                 MomentumBacktestResult training = runCore(base.startDate(), trainingEnd, base.initialCapital(),
                         candidate.entryRank(), candidate.retentionRank(), benchmark, transactionCostPercent,
                         slippagePercent, riskFreeRatePercent, rebalanceMode, bufferAmount,
-                        maximumLeverageAmount, borrowingInterestRatePercent);
+                        maximumLeverageAmount, borrowingInterestRatePercent, stockSymbols);
                 if (best == null || training.sharpeRatio() > best.sharpeRatio()) {
                     best = training; bestEntry = candidate.entryRank(); bestRetention = candidate.retentionRank();
                 }
@@ -368,7 +400,7 @@ public class MomentumBacktestService {
             if (best != null) {
                 MomentumBacktestResult test = runCore(testStart, testEnd, base.initialCapital(), bestEntry,
                         bestRetention, benchmark, transactionCostPercent, slippagePercent, riskFreeRatePercent,
-                        rebalanceMode, bufferAmount, maximumLeverageAmount, borrowingInterestRatePercent);
+                        rebalanceMode, bufferAmount, maximumLeverageAmount, borrowingInterestRatePercent, stockSymbols);
                 rows.add(new MomentumBacktestResult.WalkForwardWindow(base.startDate(), trainingEnd, testStart,
                         testEnd, bestEntry, bestRetention, best.sharpeRatio(), test.totalReturn(), test.cagr(),
                         test.maximumDrawdown(), test.sharpeRatio(), test.benchmarkReturn(), test.excessReturn()));

@@ -3,6 +3,9 @@ import { FormsModule } from '@angular/forms';
 import {CurrencyPipe,DatePipe,DecimalPipe,PercentPipe} from '@angular/common';
 import {finalize} from 'rxjs';
 import {MomentumBacktestExecutionSummary,MomentumBacktestResult,MomentumBacktestService,Rebalance} from './momentum-backtest.service';
+import {NiftyIndexName} from '../nifty-index-stock/nifty-index-stock.service';
+
+const NIFTY_INDEX_OPTIONS:{value:NiftyIndexName;label:string}[]=[{value:'NIFTY50',label:'Nifty 50'},{value:'NIFTY_NEXT50',label:'Nifty Next 50'},{value:'NIFTY200',label:'Nifty 200'},{value:'NIFTY_MIDCAP150',label:'Nifty Midcap 150'},{value:'NIFTY_SMALLCAP250',label:'Nifty Smallcap 250'},{value:'NIFTY500',label:'Nifty 500'},{value:'NIFTY750',label:'Nifty 750'}];
 
 @Component({
   selector: 'app-momentum-backtest',
@@ -15,9 +18,10 @@ export class MomentumBacktestComponent implements OnInit {
   readonly tab = signal<'overview' | 'rebalances'>('overview');
   readonly loading=signal(false); readonly result=signal<MomentumBacktestResult|null>(null); readonly selected=signal<Rebalance|null>(null); readonly error=signal('');
   readonly executions=signal<MomentumBacktestExecutionSummary[]>([]); readonly currentRunId=signal<string|null>(null);
+  readonly niftyIndexOptions=NIFTY_INDEX_OPTIONS;
   readonly setup = {
     startDate: '2021-09-01', endDate: new Date().toISOString().slice(0, 10), initialCapital: 1000000,
-    benchmark: 'NIFTY 500', entryRank: 10, retentionRank: 20, transactionCostPercent: .1, slippagePercent: .1, riskFreeRatePercent: 6.5,
+    benchmark: 'NIFTY 500', niftyIndex: 'NIFTY50' as NiftyIndexName, entryRank: 10, retentionRank: 20, transactionCostPercent: .1, slippagePercent: .1, riskFreeRatePercent: 6.5,
     rebalanceMode: 'REPLACEMENT_ONLY', bufferAmount: 200000, maximumLeverageAmount: 200000,
     borrowingInterestRatePercent: 10
   };

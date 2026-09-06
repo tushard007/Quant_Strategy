@@ -1,7 +1,8 @@
 import {HttpClient,HttpParams} from '@angular/common/http';
 import {inject,Injectable} from '@angular/core';
 import {map} from 'rxjs';
-export interface MomentumBacktestRequest{startDate:string;endDate:string;initialCapital:number;entryRank:number;retentionRank:number;benchmark:string;transactionCostPercent:number;slippagePercent:number;riskFreeRatePercent:number;rebalanceMode:string;bufferAmount:number;maximumLeverageAmount:number;borrowingInterestRatePercent:number;}
+import {NiftyIndexName} from '../nifty-index-stock/nifty-index-stock.service';
+export interface MomentumBacktestRequest{startDate:string;endDate:string;initialCapital:number;entryRank:number;retentionRank:number;benchmark:string;niftyIndex:NiftyIndexName;transactionCostPercent:number;slippagePercent:number;riskFreeRatePercent:number;rebalanceMode:string;bufferAmount:number;maximumLeverageAmount:number;borrowingInterestRatePercent:number;}
 export interface Decision{ticker:string;action:'KEEP'|'SELL'|'BUY'|'RESIZE_UP'|'RESIZE_DOWN';previousRank:number|null;currentRank:number;rank12:number;rank6:number;rank3:number;totalRank:number;originalEntryDate:string|null;executionPrice:number;quantity:number;realizedProfitLoss:number|null;}
 export interface Rebalance{signalDate:string;executionDate:string;portfolioValue:number;benchmarkValue:number;cash:number;turnoverPercent:number;costs:number;decisions:Decision[];}
 export interface Position{ticker:string;totalRank:number;quantity:number;entryPrice:number;currentPrice:number;marketValue:number;profitLoss:number;weightPercent:number;}

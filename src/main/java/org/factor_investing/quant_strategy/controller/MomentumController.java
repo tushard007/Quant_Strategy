@@ -1,6 +1,8 @@
 package org.factor_investing.quant_strategy.controller;
 
 import org.factor_investing.quant_strategy.model.AssetDataType;
+import org.factor_investing.quant_strategy.model.NiftyIndexName;
+import org.factor_investing.quant_strategy.service.NiftyIndexStockService;
 import org.factor_investing.quant_strategy.strategies.momentum.MomentumResult;
 import org.factor_investing.quant_strategy.strategies.momentum.StockMomentumService;
 import org.factor_investing.quant_strategy.model.response.MomentumExecutionSummary;
@@ -23,9 +25,11 @@ import java.util.List;
 public class MomentumController {
 
     private final StockMomentumService momentumService;
+    private final NiftyIndexStockService niftyIndexStockService;
 
-    public MomentumController(StockMomentumService momentumService) {
+    public MomentumController(StockMomentumService momentumService, NiftyIndexStockService niftyIndexStockService) {
         this.momentumService = momentumService;
+        this.niftyIndexStockService = niftyIndexStockService;
     }
 
     /**
@@ -36,9 +40,13 @@ public class MomentumController {
     public ResponseEntity<MomentumResult> calculateAndRank(
             @PathVariable AssetDataType assetDataType,
             @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOfDate
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOfDate,
+            @RequestParam(required = false) NiftyIndexName niftyIndex
     ) {
-        MomentumResult result = momentumService.calculateAndRankMomentum(assetDataType, asOfDate);
+        List<String> symbols = assetDataType == AssetDataType.STOCK && niftyIndex != null
+                ? niftyIndexStockService.symbolsForIndex(niftyIndex)
+                : null;
+        MomentumResult result = momentumService.calculateAndRankMomentum(assetDataType, asOfDate, symbols, niftyIndex);
         return result.isValid()
                 ? ResponseEntity.ok(result)
                 : ResponseEntity.badRequest().body(result);

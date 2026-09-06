@@ -4,6 +4,8 @@ import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.factor_investing.quant_strategy.model.response.MomentumBacktestResult;
 import org.factor_investing.quant_strategy.model.response.MomentumBacktestExecutionSummary;
+import org.factor_investing.quant_strategy.model.NiftyIndexName;
+import org.factor_investing.quant_strategy.service.NiftyIndexStockService;
 import org.factor_investing.quant_strategy.strategies.momentum.MomentumBacktestHistoryService;
 import org.factor_investing.quant_strategy.strategies.momentum.MomentumBacktestService;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -20,19 +22,21 @@ import java.util.UUID;
 public class MomentumBacktestController {
     private final MomentumBacktestService service;
     private final MomentumBacktestHistoryService historyService;
-    public MomentumBacktestController(MomentumBacktestService service,MomentumBacktestHistoryService historyService){this.service=service;this.historyService=historyService;}
+    private final NiftyIndexStockService niftyIndexStockService;
+    public MomentumBacktestController(MomentumBacktestService service,MomentumBacktestHistoryService historyService,NiftyIndexStockService niftyIndexStockService){this.service=service;this.historyService=historyService;this.niftyIndexStockService=niftyIndexStockService;}
 
     @PostMapping("/run/stock")
     public ResponseEntity<MomentumBacktestResult> run(@RequestParam @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate startDate,
       @RequestParam @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate endDate,
       @RequestParam(defaultValue="1000000") double initialCapital,@RequestParam(defaultValue="10") int entryRank,
       @RequestParam(defaultValue="20") int retentionRank,@RequestParam(defaultValue="NIFTY 500") String benchmark,
+      @RequestParam(defaultValue="NIFTY50") NiftyIndexName niftyIndex,
       @RequestParam(defaultValue="0.25") double transactionCostPercent,@RequestParam(defaultValue="0.1") double slippagePercent,
       @RequestParam(defaultValue="6") double riskFreeRatePercent,
       @RequestParam(defaultValue="REPLACEMENT_ONLY") String rebalanceMode,
       @RequestParam(defaultValue="0") double bufferAmount,@RequestParam(defaultValue="0") double maximumLeverageAmount,
       @RequestParam(defaultValue="0") double borrowingInterestRatePercent){
-        MomentumBacktestResult result=service.run(startDate,endDate,initialCapital,entryRank,retentionRank,benchmark,transactionCostPercent,slippagePercent,riskFreeRatePercent,rebalanceMode,bufferAmount,maximumLeverageAmount,borrowingInterestRatePercent);
+        MomentumBacktestResult result=service.run(startDate,endDate,initialCapital,entryRank,retentionRank,benchmark,transactionCostPercent,slippagePercent,riskFreeRatePercent,rebalanceMode,bufferAmount,maximumLeverageAmount,borrowingInterestRatePercent,niftyIndexStockService.symbolsForIndex(niftyIndex));
         UUID runId=historyService.save(result,entryRank,retentionRank,transactionCostPercent,slippagePercent,bufferAmount,maximumLeverageAmount);
         return ResponseEntity.ok().header("X-Backtest-Run-Id",runId.toString()).body(result);
     }
@@ -54,12 +58,13 @@ public class MomentumBacktestController {
       @RequestParam @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate endDate,
       @RequestParam(defaultValue="1000000") double initialCapital,@RequestParam(defaultValue="10") int entryRank,
       @RequestParam(defaultValue="20") int retentionRank,@RequestParam(defaultValue="NIFTY 500") String benchmark,
+      @RequestParam(defaultValue="NIFTY50") NiftyIndexName niftyIndex,
       @RequestParam(defaultValue="0.25") double transactionCostPercent,@RequestParam(defaultValue="0.1") double slippagePercent,
       @RequestParam(defaultValue="6") double riskFreeRatePercent,
       @RequestParam(defaultValue="REPLACEMENT_ONLY") String rebalanceMode,
       @RequestParam(defaultValue="0") double bufferAmount,@RequestParam(defaultValue="0") double maximumLeverageAmount,
       @RequestParam(defaultValue="0") double borrowingInterestRatePercent){
-        MomentumBacktestResult result=service.run(startDate,endDate,initialCapital,entryRank,retentionRank,benchmark,transactionCostPercent,slippagePercent,riskFreeRatePercent,rebalanceMode,bufferAmount,maximumLeverageAmount,borrowingInterestRatePercent);
+        MomentumBacktestResult result=service.run(startDate,endDate,initialCapital,entryRank,retentionRank,benchmark,transactionCostPercent,slippagePercent,riskFreeRatePercent,rebalanceMode,bufferAmount,maximumLeverageAmount,borrowingInterestRatePercent,niftyIndexStockService.symbolsForIndex(niftyIndex));
         historyService.save(result,entryRank,retentionRank,transactionCostPercent,slippagePercent,bufferAmount,maximumLeverageAmount);
         return excelResponse(result);
     }

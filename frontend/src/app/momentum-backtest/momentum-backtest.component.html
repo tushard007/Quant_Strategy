@@ -9,6 +9,7 @@
     @if(executions().length){<div class="fields"><label>Saved execution<select [ngModel]="currentRunId()" (ngModelChange)="loadExecution($event)"><option [ngValue]="null">Select a previous run</option>@for(item of executions();track item.id){<option [value]="item.id">{{item.createdAt|date:'medium'}} · {{item.startDate|date:'mediumDate'}}–{{item.endDate|date:'mediumDate'}} · {{item.entryRank}}/{{item.retentionRank}} · {{item.totalReturn|percent:'1.1-2'}}</option>}</select></label></div>}
     <div class="fields">
       <label>Start date<input type="date" [(ngModel)]="setup.startDate"></label><label>End date<input type="date" [(ngModel)]="setup.endDate"></label>
+      <label>Nifty index<select [(ngModel)]="setup.niftyIndex">@for(index of niftyIndexOptions;track index.value){<option [value]="index.value">{{index.label}}</option>}</select></label>
       <label>Initial capital<input type="number" [(ngModel)]="setup.initialCapital"></label><label>Benchmark<select [(ngModel)]="setup.benchmark"><option>NIFTY 500</option><option>NIFTY 200</option><option>NIFTY 50</option></select></label>
       <label>Entry rank<input type="number" [(ngModel)]="setup.entryRank"></label><label>Retention rank<input type="number" [(ngModel)]="setup.retentionRank"></label>
       <label>Transaction cost %<input type="number" step=".01" [(ngModel)]="setup.transactionCostPercent"></label><label>Slippage %<input type="number" step=".01" [(ngModel)]="setup.slippagePercent"></label>

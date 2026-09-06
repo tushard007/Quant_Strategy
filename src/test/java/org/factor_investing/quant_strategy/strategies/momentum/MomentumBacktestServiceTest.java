@@ -113,6 +113,26 @@ class MomentumBacktestServiceTest {
                 .doesNotContain("NEGATIVE_12M");
     }
 
+    @Test
+    void restrictsEveryBacktestRunToSelectedNiftyConstituents() {
+        Map<String,List<OHLCV>> stocks=new LinkedHashMap<>();
+        stocks.put("NIFTY_MEMBER",bars(100,.30));
+        stocks.put("OUTSIDE_INDEX",bars(100,.60));
+        StockPriceCacheService cache=new StockPriceCacheService(null){
+            @Override public Map<String,List<OHLCV>> getCachedAllStockPriceData(){return stocks;}
+            @Override public Map<String,List<OHLCV>> getCachedAllIndexPriceData(){return Map.of("NIFTY500",bars(1000,.15));}
+        };
+
+        MomentumBacktestResult result=new MomentumBacktestService(cache).run(LocalDate.of(2025,1,1),
+                LocalDate.of(2025,5,31),1_000_000,1,1,"NIFTY 500",.1,.1,6.5,
+                "REPLACEMENT_ONLY",0,0,0,List.of("nifty_member"));
+
+        assertThat(result.rebalances()).flatExtracting(MomentumBacktestResult.Rebalance::decisions)
+                .extracting(MomentumBacktestResult.Decision::ticker)
+                .contains("NIFTY_MEMBER")
+                .doesNotContain("OUTSIDE_INDEX");
+    }
+
     private List<OHLCV> bars(double start,double step){List<OHLCV> result=new ArrayList<>();LocalDate date=LocalDate.of(2024,1,1);for(int i=0;i<1000;i++){double close=start+i*step;result.add(new OHLCV(Date.valueOf(date.plusDays(i)),close,close+1,close-1,close,10000+i));}return result;}
     private List<OHLCV> barsFrom(LocalDate date,double start,double step){List<OHLCV> result=new ArrayList<>();for(int i=0;i<500;i++){double close=start+i*step;result.add(new OHLCV(Date.valueOf(date.plusDays(i)),close,close+1,close-1,close,10000+i));}return result;}
     private List<OHLCV> negativeTwelveMonthRecoveryBars(){
