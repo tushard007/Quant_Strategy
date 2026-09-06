@@ -18,5 +18,6 @@ public class NiftyIndexStock {
     private String NiftySmallcap250;
     private String Nifty500;
     private String Nifty750;
+    private String Nifty200;
 
 }
