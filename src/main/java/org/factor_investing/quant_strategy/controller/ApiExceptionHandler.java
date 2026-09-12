@@ -10,6 +10,7 @@ import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
@@ -27,8 +28,11 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidationException(MethodArgumentNotValidException ex) {
-        List<String> fieldErrors = ex.getBindingResult().getFieldErrors().stream()
-                .map(error -> error.getField() + " " + error.getDefaultMessage())
+        List<String> fieldErrors = Stream.concat(
+                        ex.getBindingResult().getFieldErrors().stream()
+                                .map(error -> error.getField() + " " + error.getDefaultMessage()),
+                        ex.getBindingResult().getGlobalErrors().stream()
+                                .map(error -> error.getObjectName() + " " + error.getDefaultMessage()))
                 .toList();
 
         Map<String, Object> body = new LinkedHashMap<>();
