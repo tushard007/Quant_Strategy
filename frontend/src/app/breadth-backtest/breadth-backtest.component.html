@@ -1,0 +1,99 @@
+<header>
+  <div><p class="eyebrow">MARKET BREADTH</p><h1>Breadth-Filtered Momentum Backtest</h1><p class="subtitle">Verify whether gating or scaling momentum exposure by market breadth improves on the plain momentum backtest.</p></div>
+  <span class="model-badge">BREADTH · VERIFICATION</span>
+</header>
+<nav class="tabs" aria-label="Breadth backtest sections">
+  <button type="button" [class.active]="tab()==='backtest'" (click)="tab.set('backtest')">Backtest</button>
+  <button type="button" [class.active]="tab()==='forward-returns'" (click)="tab.set('forward-returns')">Forward returns</button>
+  <button type="button" [class.active]="tab()==='sensitivity'" (click)="tab.set('sensitivity')">Threshold sensitivity</button>
+</nav>
+
+@if(tab()==='backtest'){
+  <section class="panel">
+    <div class="panel-heading"><div><h2>Backtest setup</h2><p>Runs the same risk-adjusted momentum engine twice: once unfiltered (baseline) and once gated/scaled by the persisted breadth score for the chosen universe.</p></div></div>
+    @if(executions().length){<div class="fields"><label>Saved run<select [ngModel]="currentRunId()" (ngModelChange)="loadExecution($event)"><option [ngValue]="null">Select a previous run</option>@for(item of executions();track item.id){<option [value]="item.id">{{item.createdAt|date:'medium'}} · {{item.breadthUniverse}} · {{item.breadthEntryMode}} · cutoff {{item.breadthScoreCutoff}} · {{item.filteredTotalReturn|percent:'1.1-2'}}</option>}</select></label></div>}
+    <div class="fields">
+      <label>Start date<input type="date" [(ngModel)]="setup.startDate"></label><label>End date<input type="date" [(ngModel)]="setup.endDate"></label>
+      <label>Initial capital<input type="number" [(ngModel)]="setup.initialCapital"></label><label>Benchmark<select [(ngModel)]="setup.benchmark"><option>NIFTY 500</option><option>NIFTY 200</option><option>NIFTY 50</option></select></label>
+      <label>Entry rank<input type="number" [(ngModel)]="setup.entryRank"></label><label>Retention rank<input type="number" [(ngModel)]="setup.retentionRank"></label>
+      <label>Transaction cost %<input type="number" step=".01" [(ngModel)]="setup.transactionCostPercent"></label><label>Slippage %<input type="number" step=".01" [(ngModel)]="setup.slippagePercent"></label>
+      <label>Annual risk-free rate %<input type="number" min="0" max="100" step=".1" [(ngModel)]="setup.riskFreeRatePercent"></label>
+      <label>Loss buffer amount<input type="number" min="0" step="10000" [(ngModel)]="setup.bufferAmount"></label>
+      <label>Maximum leverage<input type="number" min="0" step="10000" [(ngModel)]="setup.maximumLeverageAmount"></label>
+      <label>Borrowing interest % p.a.<input type="number" min="0" step=".1" [(ngModel)]="setup.borrowingInterestRatePercent"></label>
+      <label>Rebalance mode<select [(ngModel)]="setup.rebalanceMode"><option value="REPLACEMENT_ONLY">Replacement only</option><option value="EQUAL_WEIGHT">Equal-weight monthly</option></select></label>
+      <label>Stop model<select [(ngModel)]="setup.stopModel"><option value="FIXED">Fixed trail</option><option value="TIERED">Tiered trail</option><option value="ATR">ATR Chandelier</option></select></label>
+      <label>Trailing stop %<input type="number" min="0.1" max="99.9" step=".1" [(ngModel)]="setup.trailingStopPercent"></label>
+      <label>ATR period<input type="number" min="2" [(ngModel)]="setup.atrPeriod"></label><label>ATR multiplier<input type="number" min="0.1" step=".5" [(ngModel)]="setup.atrMultiplier"></label>
+      <label>Cooldown weeks<input type="number" min="0" [(ngModel)]="setup.cooldownWeeks"></label>
+      <label>Benchmark SMA period<input type="number" min="2" [(ngModel)]="setup.benchmarkSmaPeriod"></label>
+      <label>Breadth threshold %<input type="number" min="0" max="100" [(ngModel)]="setup.breadthThresholdPercent"></label>
+      <label>Weak exposure cap %<input type="number" min="0" max="100" [(ngModel)]="setup.weakExposureCapPercent"></label>
+      <label>Breadth universe<select [(ngModel)]="setup.breadthUniverse">@for(u of universeOptions;track u){<option [value]="u">{{u}}</option>}</select></label>
+      <label>Breadth entry mode<select [(ngModel)]="setup.breadthEntryMode">@for(m of entryModeOptions;track m){<option [value]="m">{{m}}</option>}</select></label>
+      <label>Breadth score cutoff<input type="number" min="0" max="100" [(ngModel)]="setup.breadthScoreCutoff"></label>
+      <button class="run" type="button" (click)="run()" [disabled]="loading()">{{loading()?'Running…':'Run breadth-filtered backtest'}} <span>→</span></button>
+    </div>
+    @if(error()){<p class="error">{{error()}}</p>}
+  </section>
+  @if(result();as data){
+    <section class="panel">
+      <div class="panel-heading"><div><h2>Baseline vs. breadth-filtered</h2><p>{{data.breadthUniverse}} · {{data.breadthEntryMode}} · score cutoff {{data.breadthScoreCutoff}} · methodology {{data.methodology}} · score configuration v{{data.representativeScoreConfigurationVersion}}</p></div></div>
+      <div class="table-scroll"><table><thead><tr><th>Metric</th><th>Baseline</th><th>Breadth-filtered</th><th>Difference</th></tr></thead><tbody>
+        <tr><td>Total return</td><td>{{data.baseline.totalReturn|percent:'1.1-2'}}</td><td>{{data.breadthFiltered.totalReturn|percent:'1.1-2'}}</td><td [class.expanded]="data.breadthFiltered.totalReturn>data.baseline.totalReturn">{{(data.breadthFiltered.totalReturn-data.baseline.totalReturn)|percent:'1.1-2'}}</td></tr>
+        <tr><td>CAGR</td><td>{{data.baseline.cagr|percent:'1.1-2'}}</td><td>{{data.breadthFiltered.cagr|percent:'1.1-2'}}</td><td [class.expanded]="data.breadthFiltered.cagr>data.baseline.cagr">{{(data.breadthFiltered.cagr-data.baseline.cagr)|percent:'1.1-2'}}</td></tr>
+        <tr><td>Sharpe ratio</td><td>{{data.baseline.sharpeRatio|number:'1.2-2'}}</td><td>{{data.breadthFiltered.sharpeRatio|number:'1.2-2'}}</td><td [class.expanded]="data.breadthFiltered.sharpeRatio>data.baseline.sharpeRatio">{{(data.breadthFiltered.sharpeRatio-data.baseline.sharpeRatio)|number:'1.2-2'}}</td></tr>
+        <tr><td>Maximum drawdown</td><td>{{data.baseline.maximumDrawdown|percent:'1.1-2'}}</td><td>{{data.breadthFiltered.maximumDrawdown|percent:'1.1-2'}}</td><td [class.expanded]="data.breadthFiltered.maximumDrawdown>data.baseline.maximumDrawdown">{{(data.breadthFiltered.maximumDrawdown-data.baseline.maximumDrawdown)|percent:'1.1-2'}}</td></tr>
+        <tr><td>Sortino ratio</td><td>{{data.baseline.sortinoRatio|number:'1.2-2'}}</td><td>{{data.breadthFiltered.sortinoRatio|number:'1.2-2'}}</td><td>{{(data.breadthFiltered.sortinoRatio-data.baseline.sortinoRatio)|number:'1.2-2'}}</td></tr>
+        <tr><td>Final value</td><td>{{data.baseline.finalValue|currency:'INR':'symbol':'1.0-0'}}</td><td>{{data.breadthFiltered.finalValue|currency:'INR':'symbol':'1.0-0'}}</td><td>{{(data.breadthFiltered.finalValue-data.baseline.finalValue)|currency:'INR':'symbol':'1.0-0'}}</td></tr>
+        <tr><td>Rebalance count</td><td>{{data.baseline.rebalanceCount}}</td><td>{{data.breadthFiltered.rebalanceCount}}</td><td>{{data.breadthFiltered.rebalanceCount-data.baseline.rebalanceCount}}</td></tr>
+        <tr><td>Total costs</td><td>{{data.baseline.totalCosts|currency:'INR':'symbol':'1.0-0'}}</td><td>{{data.breadthFiltered.totalCosts|currency:'INR':'symbol':'1.0-0'}}</td><td>{{(data.breadthFiltered.totalCosts-data.baseline.totalCosts)|currency:'INR':'symbol':'1.0-0'}}</td></tr>
+      </tbody></table></div>
+    </section>
+    @if(data.coverageNotes.length){
+      <section class="panel"><div class="panel-heading"><div><h2>Coverage notes</h2><p>Signal dates where a breadth snapshot was missing or stale, and how the gate defaulted.</p></div></div><div class="table-scroll"><table><thead><tr><th>Signal date</th><th>Reason</th></tr></thead><tbody>@for(n of data.coverageNotes;track n.signalDate){<tr><td>{{n.signalDate|date:'mediumDate'}}</td><td>{{n.reason}}</td></tr>}</tbody></table></div></section>
+    }
+    <section class="panel"><div class="panel-heading"><div><h2>Breadth-filtered regime history</h2><p>Breadth percent and new-buy eligibility recorded for the filtered run at each signal date.</p></div></div><div class="table-scroll"><table><thead><tr><th>Signal</th><th>Breadth</th><th>Benchmark above SMA</th><th>Exposure cap</th><th>New buys</th></tr></thead><tbody>@for(item of data.breadthFiltered.regimeExposureHistory.slice().reverse();track item.signalDate){<tr><td>{{item.signalDate|date:'mediumDate'}}</td><td>{{item.breadthPercent|number:'1.1-2'}}%</td><td>{{item.benchmarkAboveSma?'Yes':'No'}}</td><td>{{item.exposureCapPercent|number:'1.0-1'}}%</td><td>{{item.newBuysAllowed?'Allowed':'Blocked'}}</td></tr>}</tbody></table></div></section>
+  }
+} @else if(tab()==='forward-returns'){
+  <section class="panel">
+    <div class="panel-heading"><div><h2>Forward-return analysis</h2><p>Not persisted — groups every persisted breadth snapshot in range by regime and score bucket, then measures the index's forward 20/60-session close-to-close return.</p></div></div>
+    <div class="fields">
+      <label>Universe<select [(ngModel)]="fSetup.universe">@for(u of universeOptions;track u){<option [value]="u">{{u}}</option>}</select></label>
+      <label>From<input type="date" [(ngModel)]="fSetup.from"></label><label>To<input type="date" [(ngModel)]="fSetup.to"></label>
+      <label>Benchmark index<select [(ngModel)]="fSetup.benchmark"><option>NIFTY 500</option><option>NIFTY 200</option><option>NIFTY 50</option></select></label>
+      <button class="run" type="button" (click)="runForwardReturnAnalysis()" [disabled]="fLoading()">{{fLoading()?'Analyzing…':'Run forward-return analysis'}} <span>→</span></button>
+    </div>
+    @if(fError()){<p class="error">{{fError()}}</p>}
+  </section>
+  @if(fResult();as data){
+    <section class="metrics risk-metrics">
+      <article><span>Total observations</span><strong>{{data.totalObservations}}</strong><small>{{data.universe}} · {{data.from|date:'mediumDate'}}–{{data.to|date:'mediumDate'}}</small></article>
+      <article><span>Missing forward 20</span><strong>{{data.observationsMissingForward20}}</strong><small>Not enough future bars</small></article>
+      <article><span>Missing forward 60</span><strong>{{data.observationsMissingForward60}}</strong><small>Not enough future bars</small></article>
+    </section>
+    <section class="panel"><div class="panel-heading"><div><h2>By regime</h2></div></div><div class="table-scroll"><table><thead><tr><th>Regime</th><th>Samples</th><th>Mean 20d</th><th>Median 20d</th><th>% positive 20d</th><th>Worst 20d</th><th>Mean 60d</th><th>Median 60d</th><th>% positive 60d</th><th>Worst 60d</th></tr></thead><tbody>@for(item of data.byRegime;track item.groupKey){<tr><td><strong>{{item.groupKey}}</strong></td><td>{{item.sampleCount}}</td><td>{{item.meanReturn20|percent:'1.1-2'}}</td><td>{{item.medianReturn20|percent:'1.1-2'}}</td><td>{{item.positiveRatePercent20|number:'1.1-1'}}%</td><td>{{item.worstReturn20|percent:'1.1-2'}}</td><td>{{item.meanReturn60|percent:'1.1-2'}}</td><td>{{item.medianReturn60|percent:'1.1-2'}}</td><td>{{item.positiveRatePercent60|number:'1.1-1'}}%</td><td>{{item.worstReturn60|percent:'1.1-2'}}</td></tr>}</tbody></table></div></section>
+    <section class="panel"><div class="panel-heading"><div><h2>By score bucket</h2><p>Buckets of 10 points, keyed by the bucket's lower bound.</p></div></div><div class="table-scroll"><table><thead><tr><th>Bucket</th><th>Samples</th><th>Mean 20d</th><th>Median 20d</th><th>% positive 20d</th><th>Worst 20d</th><th>Mean 60d</th><th>Median 60d</th><th>% positive 60d</th><th>Worst 60d</th></tr></thead><tbody>@for(item of data.byScoreBucket;track item.groupKey){<tr><td><strong>{{item.groupKey}}</strong></td><td>{{item.sampleCount}}</td><td>{{item.meanReturn20|percent:'1.1-2'}}</td><td>{{item.medianReturn20|percent:'1.1-2'}}</td><td>{{item.positiveRatePercent20|number:'1.1-1'}}%</td><td>{{item.worstReturn20|percent:'1.1-2'}}</td><td>{{item.meanReturn60|percent:'1.1-2'}}</td><td>{{item.medianReturn60|percent:'1.1-2'}}</td><td>{{item.positiveRatePercent60|number:'1.1-1'}}%</td><td>{{item.worstReturn60|percent:'1.1-2'}}</td></tr>}</tbody></table></div></section>
+    <section class="panel"><div class="panel-heading"><div><h2>By regime &amp; score bucket</h2></div></div><div class="table-scroll"><table><thead><tr><th>Group</th><th>Samples</th><th>Mean 20d</th><th>Median 20d</th><th>% positive 20d</th><th>Worst 20d</th><th>Mean 60d</th><th>Median 60d</th><th>% positive 60d</th><th>Worst 60d</th></tr></thead><tbody>@for(item of data.byRegimeAndScoreBucket;track item.groupKey){<tr><td><strong>{{item.groupKey}}</strong></td><td>{{item.sampleCount}}</td><td>{{item.meanReturn20|percent:'1.1-2'}}</td><td>{{item.medianReturn20|percent:'1.1-2'}}</td><td>{{item.positiveRatePercent20|number:'1.1-1'}}%</td><td>{{item.worstReturn20|percent:'1.1-2'}}</td><td>{{item.meanReturn60|percent:'1.1-2'}}</td><td>{{item.medianReturn60|percent:'1.1-2'}}</td><td>{{item.positiveRatePercent60|number:'1.1-1'}}%</td><td>{{item.worstReturn60|percent:'1.1-2'}}</td></tr>}</tbody></table></div></section>
+  }
+} @else {
+  <section class="panel">
+    <div class="panel-heading"><div><h2>Threshold sensitivity grid</h2><p>Runs the breadth-filtered backtest across a grid of universes, entry modes, score cutoffs and MA bases. Cells with too few qualifying periods are excluded and listed as warnings.</p></div></div>
+    @if(sExecutions().length){<div class="fields"><label>Saved run<select [ngModel]="sCurrentRunId()" (ngModelChange)="loadSensitivityExecution($event)"><option [ngValue]="null">Select a previous run</option>@for(item of sExecutions();track item.id){<option [value]="item.id">{{item.createdAt|date:'medium'}} · {{item.sampleCount}} cells</option>}</select></label></div>}
+    <div class="fields">
+      <label>Start date<input type="date" [(ngModel)]="sSetup.startDate"></label><label>End date<input type="date" [(ngModel)]="sSetup.endDate"></label>
+      <label>Universes<select multiple [(ngModel)]="sSetup.universes">@for(u of universeOptions;track u){<option [value]="u">{{u}}</option>}</select></label>
+      <label>Entry modes<select multiple [(ngModel)]="sSetup.entryModes">@for(m of entryModeOptions;track m){<option [value]="m">{{m}}</option>}</select></label>
+      <label>Score cutoffs (comma-separated)<input type="text" [(ngModel)]="sSetup.scoreCutoffsText"></label>
+      <label>MA bases<select multiple [(ngModel)]="sSetup.movingAverageBasesToCompare">@for(b of maBasisOptions;track b){<option [value]="b">{{b}}</option>}</select></label>
+      <label>Entry rank<input type="number" [(ngModel)]="sSetup.entryRank"></label><label>Retention rank<input type="number" [(ngModel)]="sSetup.retentionRank"></label>
+      <label>Initial capital<input type="number" [(ngModel)]="sSetup.initialCapital"></label><label>Benchmark<select [(ngModel)]="sSetup.benchmark"><option>NIFTY 500</option><option>NIFTY 200</option><option>NIFTY 50</option></select></label>
+      <button class="run" type="button" (click)="runSensitivity()" [disabled]="sLoading()">{{sLoading()?'Running…':'Run sensitivity grid'}} <span>→</span></button>
+    </div>
+    @if(sError()){<p class="error">{{sError()}}</p>}
+  </section>
+  @if(sResult();as data){
+    @if(data.warnings.length){<section class="panel"><div class="panel-heading"><div><h2>Warnings</h2><p>Cells excluded for having too few qualifying periods.</p></div></div><ul>@for(w of data.warnings;track w){<li>{{w}}</li>}</ul></section>}
+    <section class="panel"><div class="panel-heading"><div><h2>Sensitivity cells</h2><p>{{data.cells.length}} qualifying cell(s).</p></div></div><div class="table-scroll"><table><thead><tr><th>Universe</th><th>Entry mode</th><th>Cutoff</th><th>MA basis</th><th>Baseline return</th><th>Filtered return</th><th>Baseline Sharpe</th><th>Filtered Sharpe</th><th>Baseline drawdown</th><th>Filtered drawdown</th><th>Samples</th><th>Rebalances</th></tr></thead><tbody>@for(cell of data.cells;track cell.universe+cell.entryMode+cell.scoreCutoff+cell.maBasis){<tr [class.expanded]="cell.filteredSharpeRatio>cell.baselineSharpeRatio"><td>{{cell.universe}}</td><td>{{cell.entryMode}}</td><td>{{cell.scoreCutoff}}</td><td>{{cell.maBasis}}</td><td>{{cell.baselineTotalReturn|percent:'1.1-2'}}</td><td>{{cell.filteredTotalReturn|percent:'1.1-2'}}</td><td>{{cell.baselineSharpeRatio|number:'1.2-2'}}</td><td>{{cell.filteredSharpeRatio|number:'1.2-2'}}</td><td>{{cell.baselineMaxDrawdown|percent:'1.1-2'}}</td><td>{{cell.filteredMaxDrawdown|percent:'1.1-2'}}</td><td>{{cell.qualifyingSnapshotSampleCount}}</td><td>{{cell.rebalanceCount}}</td></tr>}</tbody></table></div></section>
+  }
+}

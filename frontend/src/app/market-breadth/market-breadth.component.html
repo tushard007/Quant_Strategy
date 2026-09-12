@@ -1,0 +1,401 @@
+<header class="page-header">
+  <div>
+    <p class="eyebrow">MARKET REGIME</p>
+    <h1>Market Breadth</h1>
+    <p class="subtitle">
+      Participation, momentum suitability, and transition alerts across the NIFTY universe.
+    </p>
+  </div>
+  <button class="ghost-button" type="button" (click)="refreshDashboard()" [disabled]="loading()">
+    Refresh data
+  </button>
+</header>
+
+<section class="control-bar" aria-label="Dashboard filters">
+  <label
+    >Universe
+    <select [value]="selectedUniverse()" (change)="setUniverse($event)">
+      @for (universe of universes; track universe.value) {
+        <option [value]="universe.value">{{ universe.label }}</option>
+      }
+    </select>
+  </label>
+  <label
+    >From
+    <input required type="date" [value]="fromDate()" (change)="setFromDate($event)" [max]="toDate()" />
+  </label>
+  <label
+    >To
+    <input required type="date" [value]="toDate()" (change)="setToDate($event)" [min]="fromDate()" />
+  </label>
+  <button
+    class="primary-button"
+    type="button"
+    (click)="refreshDashboard()"
+    [disabled]="loading() || dateRangeInvalid()"
+  >
+    {{ loading() ? 'Loading…' : 'Apply' }}
+  </button>
+  <button
+    class="secondary-button"
+    type="button"
+    (click)="recalculate()"
+    [disabled]="recalculating() || loading() || dateRangeInvalid()"
+  >
+    {{ recalculating() ? 'Calculating…' : 'Recalculate range' }}
+  </button>
+  <button
+    class="secondary-button export-button"
+    type="button"
+    (click)="exportExcel()"
+    [disabled]="exporting() || loading() || !history().length"
+  >
+    {{ exporting() ? 'Preparing Excel…' : 'Export Excel' }}
+  </button>
+</section>
+
+@if (dateRangeInvalid()) {
+  <div class="message error" role="alert">{{ dateRangeError() }}</div>
+}
+@if (dashboardError()) {
+  <div class="message error" role="alert">
+    {{ dashboardError() }} <button type="button" (click)="refreshDashboard()">Retry</button>
+  </div>
+}
+@if (recalculationMessage()) {
+  <div class="message success" role="status">{{ recalculationMessage() }}</div>
+}
+
+@if (loading() && !latest()) {
+  <div class="loading-shell" aria-live="polite">
+    <span class="spinner"></span><strong>Loading breadth dashboard…</strong>
+  </div>
+} @else if (latest(); as snapshot) {
+  @if (stale()) {
+    <div class="message warning" role="status">
+      Latest snapshot is from {{ snapshot.tradingDate }}. Check the EOD pipeline if a newer trading
+      session is expected.
+    </div>
+  }
+  @if (snapshot.qualityStatus !== 'VALID') {
+    <div class="message warning" role="status">
+      {{ snapshot.qualityStatus }} data quality — coverage is
+      {{ snapshot.coveragePercent | number: '1.1-1' }}%. Interpret this regime cautiously.
+    </div>
+  }
+  @if (snapshot.methodology === 'CURRENT_CONSTITUENTS') {
+    <div class="message methodology" role="note">
+      Uses today's index constituents across the selected history. This can introduce survivorship
+      bias in historical interpretation.
+    </div>
+  }
+
+  <section class="regime-card" [attr.data-regime]="snapshot.regime">
+    <div class="score-ring" [style.--score]="snapshot.score">
+      <div>
+        <strong>{{ snapshot.score | number: '1.0-1' }}</strong
+        ><span>/ 100</span>
+      </div>
+    </div>
+    <div class="regime-copy">
+      <span class="regime-badge">{{ snapshot.regime }} REGIME</span>
+      <h2>{{ universeLabel(snapshot.universe) }} participation</h2>
+      <p>{{ regimeMessage(snapshot.regime) }}</p>
+      <div class="metadata">
+        <span
+          >As of <strong>{{ snapshot.tradingDate }}</strong></span
+        >
+        <span
+          >Coverage <strong>{{ snapshot.coveragePercent | number: '1.1-1' }}%</strong></span
+        >
+        <span
+          >Quality <strong>{{ snapshot.qualityStatus }}</strong></span
+        >
+        <span
+          >Score model <strong>v{{ snapshot.scoreConfigurationVersion }}</strong></span
+        >
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <p class="eyebrow">TODAY'S READ</p>
+        <h2>Core indicators</h2>
+      </div>
+      <span>{{ snapshot.tradingDate }}</span>
+    </div>
+    <div class="indicator-grid">
+      @for (card of indicatorCards(); track card.label) {
+        <article class="indicator-card" [attr.data-tone]="card.tone">
+          <span>{{ card.label }}</span
+          ><strong>{{ card.value }}</strong
+          ><small>{{ card.detail }}</small>
+        </article>
+      }
+    </div>
+  </section>
+
+  <div class="chart-grid">
+    <section class="panel chart-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">CONFIRMATION</p>
+          <h2>NIFTY vs A/D line</h2>
+        </div>
+        <small>Normalised change</small>
+      </div>
+      <app-breadth-line-chart
+        [labels]="chartLabels()"
+        [series]="benchmarkAdSeries()"
+        [normalized]="true"
+        accessibleLabel="Normalised NIFTY close and advance decline line history"
+      />
+    </section>
+    <section class="panel chart-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">PARTICIPATION</p>
+          <h2>Moving-average breadth</h2>
+        </div>
+        <small>50% reference</small>
+      </div>
+      <app-breadth-line-chart
+        [labels]="chartLabels()"
+        [series]="movingAverageSeries()"
+        [threshold]="50"
+        accessibleLabel="Percentage of stocks above 50-day and 200-day moving averages"
+      />
+    </section>
+    <section class="panel chart-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">MOMENTUM</p>
+          <h2>McClellan breadth</h2>
+        </div>
+        <small>Normalised change</small>
+      </div>
+      <app-breadth-line-chart
+        [labels]="chartLabels()"
+        [series]="mcclellanSeries()"
+        [normalized]="true"
+        accessibleLabel="McClellan oscillator and summation index history"
+      />
+    </section>
+    <section class="panel chart-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">LEADERSHIP</p>
+          <h2>New highs and lows</h2>
+        </div>
+        <small>{{ history().length }} sessions shown · 252-session high/low lookback</small>
+      </div>
+      <app-breadth-line-chart
+        [labels]="chartLabels()"
+        [series]="highLowSeries()"
+        accessibleLabel="New highs and new lows history"
+      />
+    </section>
+  </div>
+
+  @if (sectors(); as sectorData) {
+    <section class="panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">SECTOR CONFIRMATION</p>
+          <h2>
+            {{ sectorData.participatingSectors }} of {{ sectorData.availableSectors }} sectors
+            participating
+          </h2>
+        </div>
+        @if (snapshot.indicators['NARROW_LEADERSHIP'] > 0.5) {
+          <span class="risk-flag">Narrow leadership</span>
+        }
+      </div>
+      @if (sectorData.sectors.length) {
+        <div class="sector-grid">
+          @for (sector of sectorData.sectors; track sector.symbol) {
+            <article [class.above]="sector.above50DayEma" [class.below]="!sector.above50DayEma">
+              <span>{{ sector.above50DayEma ? '▲ Above EMA' : '▼ Below EMA' }}</span>
+              <strong>{{ sector.symbol }}</strong>
+              <small
+                >{{ sector.distancePercent >= 0 ? '+' : ''
+                }}{{ sector.distancePercent | number: '1.1-1' }}% from 50-day EMA</small
+              >
+            </article>
+          }
+        </div>
+      } @else {
+        <p class="empty-state">No sector measurements are available for this snapshot.</p>
+      }
+    </section>
+  }
+
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <p class="eyebrow">WHY THIS SCORE?</p>
+        <h2>Score breakdown</h2>
+      </div>
+      @if (configuration(); as config) {
+        <span
+          >Configuration v{{ config.version }} · Green ≥ {{ config.greenThreshold }} · Amber ≥
+          {{ config.amberThreshold }}</span
+        >
+      }
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>Points</th>
+            <th>Weight</th>
+            <th>Explanation</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of scoreRows(); track row.key) {
+            <tr>
+              <td>
+                <strong>{{ row.label }}</strong>
+              </td>
+              <td>{{ row.points | number: '1.0-1' }}</td>
+              <td>{{ row.weight }}</td>
+              <td>{{ row.reason }}</td>
+            </tr>
+          }
+          <tr class="total-row">
+            <td>Total breadth score</td>
+            <td>{{ snapshot.score | number: '1.0-1' }}</td>
+            <td>100</td>
+            <td>{{ regimeMessage(snapshot.regime) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    @if (
+      snapshot.componentReasons['RISK_OVERRIDE'] || snapshot.componentReasons['QUALITY_OVERRIDE']
+    ) {
+      <p class="override-note">
+        <strong>Override:</strong>
+        {{
+          snapshot.componentReasons['RISK_OVERRIDE'] ||
+            snapshot.componentReasons['QUALITY_OVERRIDE']
+        }}
+      </p>
+    }
+  </section>
+} @else if (!dashboardError()) {
+  <section class="panel empty-state" role="status">
+    No breadth snapshot exists in the selected date range. Choose a wider range or run
+    recalculation.
+  </section>
+}
+
+<section class="panel">
+  <div class="section-heading">
+    <div>
+      <p class="eyebrow">TRANSITIONS</p>
+      <h2>In-app alert history</h2>
+    </div>
+  </div>
+  <div class="alert-controls">
+    <label
+      >Alert type
+      <select [value]="alertType()" (change)="setAlertType($event)">
+        <option value="">All alert types</option>
+        @for (type of alertTypes; track type) {
+          <option [value]="type">{{ alertTypeLabel(type) }}</option>
+        }
+      </select>
+    </label>
+    <button
+      class="secondary-button"
+      type="button"
+      (click)="loadAlerts()"
+      [disabled]="alertsLoading()"
+    >
+      Apply alert filter
+    </button>
+  </div>
+  @if (alertsLoading()) {
+    <p class="empty-state">Loading alerts…</p>
+  } @else if (alertsError()) {
+    <div class="message error">
+      {{ alertsError() }} <button type="button" (click)="loadAlerts()">Retry</button>
+    </div>
+  } @else if (!alertsLoaded()) {
+    <p class="empty-state">Alert history has not been loaded. Apply the alert filter to load it.</p>
+  } @else if (!alerts().length) {
+    <p class="empty-state">No breadth transitions match this universe, period, and alert type.</p>
+  } @else {
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Universe</th>
+            <th>Signal</th>
+            <th>Message</th>
+            <th>Channel</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (alert of alerts(); track alert.id) {
+            <tr>
+              <td>{{ alert.triggerDate }}</td>
+              <td>{{ universeLabel(alert.universe) }}</td>
+              <td>
+                <span class="signal-pill">{{ alertTypeLabel(alert.alertType) }}</span>
+              </td>
+              <td>{{ alert.message }}</td>
+              <td>In app</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>
+
+<details class="diagnostics panel">
+  <summary>
+    <span>Reference data diagnostics</span
+    ><small
+      >{{ referenceDataStatus() }}</small
+    >
+  </summary>
+  @if (referenceDataLoading()) {
+    <p class="empty-state">Checking index reference data…</p>
+  } @else if (referenceDataError()) {
+    <div class="message error">
+      {{ referenceDataError() }} <button type="button" (click)="loadReferenceData()">Retry</button>
+    </div>
+  } @else {
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Index</th>
+            <th>Status</th>
+            <th>Detail</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of referenceDataRows(); track row.symbol) {
+            <tr>
+              <td>{{ row.symbol }}</td>
+              <td>
+                <span class="status-dot" [class.ok]="row.ok"></span
+                >{{ row.ok ? 'Ready' : issueTypeLabel(row.issue!.issueType) }}
+              </td>
+              <td>{{ row.ok ? 'Price history available' : row.issue!.detail }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</details>

@@ -1,0 +1,39 @@
+<div class="chart" role="img" [attr.aria-label]="accessibleLabel">
+  @if (renderedSeries.length && renderedSeries[0].path) {
+    <svg [attr.viewBox]="'0 0 ' + width + ' ' + height" aria-hidden="true">
+      <line class="grid" [attr.x1]="left" [attr.x2]="width - right" y1="18" y2="18" />
+      <line class="grid" [attr.x1]="left" [attr.x2]="width - right" y1="115" y2="115" />
+      <line class="grid" [attr.x1]="left" [attr.x2]="width - right" y1="212" y2="212" />
+      @if (thresholdY !== null) {
+        <line
+          class="threshold"
+          [attr.x1]="left"
+          [attr.x2]="width - right"
+          [attr.y1]="thresholdY"
+          [attr.y2]="thresholdY"
+        />
+      }
+      @for (item of renderedSeries; track item.label) {
+        <path [attr.d]="item.path" [attr.stroke]="item.color" />
+      }
+      <text x="4" y="22">{{ domainLabels[0] }}</text>
+      <text x="4" y="119">{{ domainLabels[1] }}</text>
+      <text x="4" y="216">{{ domainLabels[2] }}</text>
+    </svg>
+    <div class="dates">
+      @for (label of dateLabels; track label) {
+        <span>{{ label }}</span>
+      }
+    </div>
+    <div class="legend">
+      @for (item of series; track item.label) {
+        <span><i [style.background]="item.color"></i>{{ item.label }}</span>
+      }
+      @if (threshold !== null && !normalized) {
+        <span><i class="threshold-key"></i>{{ threshold }} reference</span>
+      }
+    </div>
+  } @else {
+    <p class="no-data">No chart points in the selected period.</p>
+  }
+</div>

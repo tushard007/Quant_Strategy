@@ -4,6 +4,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
@@ -41,6 +42,17 @@ public class ApiExceptionHandler {
         body.put("error", BAD_REQUEST.toString());
         body.put("message", "Request validation failed");
         body.put("details", fieldErrors);
+        return ResponseEntity.status(BAD_REQUEST).body(body);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<Map<String, Object>> handleTypeMismatchException(MethodArgumentTypeMismatchException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", OffsetDateTime.now().toString());
+        body.put("status", BAD_REQUEST.value());
+        body.put("error", BAD_REQUEST.toString());
+        String expectedType = ex.getRequiredType() == null ? "the expected type" : ex.getRequiredType().getSimpleName();
+        body.put("message", ex.getName() + " must be a valid " + expectedType + ": '" + ex.getValue() + "'");
         return ResponseEntity.status(BAD_REQUEST).body(body);
     }
 
