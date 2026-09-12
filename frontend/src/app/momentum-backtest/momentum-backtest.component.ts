@@ -27,9 +27,17 @@ export class MomentumBacktestComponent implements OnInit {
   };
   ngOnInit(){this.refreshExecutions();}
   run(){this.loading.set(true);this.error.set('');this.service.run(this.setup).pipe(finalize(()=>this.loading.set(false))).subscribe({next:value=>{this.result.set(value.result);this.currentRunId.set(value.runId);this.refreshExecutions();this.tab.set('overview');},error:error=>this.error.set(error?.error?.message||error?.error?.detail||'Momentum backtest failed.')});}
-  loadExecution(runId:string){if(!runId)return;this.loading.set(true);this.error.set('');this.service.execution(runId).pipe(finalize(()=>this.loading.set(false))).subscribe({next:value=>{this.result.set(value);this.currentRunId.set(runId);this.selected.set(null);},error:error=>this.error.set(error?.error?.message||error?.error?.detail||'Could not load the saved execution.')});}
+  loadExecution(runId:string){if(!runId)return;this.loading.set(true);this.error.set('');this.service.execution(runId).pipe(finalize(()=>this.loading.set(false))).subscribe({next:value=>{this.result.set(value);this.currentRunId.set(runId);this.selected.set(null);this.syncSetupFromResult(runId,value);},error:error=>this.error.set(error?.error?.message||error?.error?.detail||'Could not load the saved execution.')});}
+  private syncSetupFromResult(runId:string,data:MomentumBacktestResult){
+    const summary=this.executions().find(item=>item.id===runId);
+    this.setup.startDate=data.startDate;this.setup.endDate=data.endDate;this.setup.initialCapital=data.initialCapital;
+    this.setup.benchmark=data.benchmark;this.setup.riskFreeRatePercent=data.riskFreeRatePercent;this.setup.rebalanceMode=data.rebalanceMode;
+    this.setup.bufferAmount=data.bufferAmount;this.setup.maximumLeverageAmount=data.maximumLeverageAmount;this.setup.borrowingInterestRatePercent=data.borrowingInterestRatePercent;
+    if(summary){this.setup.entryRank=summary.entryRank;this.setup.retentionRank=summary.retentionRank;}
+  }
   refreshExecutions(){this.service.history().subscribe({next:value=>this.executions.set(value),error:()=>this.executions.set([])});}
   export(){const request=this.currentRunId()?this.service.exportExecution(this.currentRunId()!):this.service.export(this.setup);request.subscribe(blob=>{const data=this.result();const url=URL.createObjectURL(blob);const anchor=document.createElement('a');anchor.href=url;anchor.download=`momentum-backtest-${data?.startDate||this.setup.startDate}-to-${data?.endDate||this.setup.endDate}.xlsx`;anchor.click();URL.revokeObjectURL(url);});}
   show(item:Rebalance){this.selected.update(current=>current?.signalDate===item.signalDate?null:item);this.tab.set('rebalances');}
   count(item:Rebalance,action:'KEEP'|'SELL'|'BUY'){return item.decisions.filter(value=>value.action===action).length;}
+  resizeCount(item:Rebalance){return item.decisions.filter(value=>value.action==='RESIZE_UP'||value.action==='RESIZE_DOWN').length;}
 }

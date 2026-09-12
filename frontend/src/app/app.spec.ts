@@ -16,10 +16,10 @@ describe('App', () => {
     expect(app).toBeTruthy();
   });
 
-  it('should render the price data master', async () => {
+  it('should render the momentum dashboard', async () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain('Price Data Master');
+    expect(compiled.querySelector('h1')?.textContent).toContain('Momentum dashboard');
   });
 });

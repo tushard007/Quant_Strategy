@@ -1,7 +1,12 @@
 <div class="app-shell" [attr.data-theme]="theme()">
   <aside class="sidebar">
     <div class="brand"><span class="brand-mark">Q</span><div><strong>Quant Strategy</strong><small>Operations Console</small></div></div>
-    <nav aria-label="Main navigation">
+    <button class="mobile-menu-toggle" type="button" aria-controls="main-navigation"
+      [attr.aria-expanded]="mobileNavigationOpen()"
+      (click)="mobileNavigationOpen.set(!mobileNavigationOpen())">
+      {{ mobileNavigationOpen() ? 'Close menu' : 'Open menu' }}
+    </button>
+    <nav id="main-navigation" aria-label="Main navigation" [class.mobile-open]="mobileNavigationOpen()">
       <div class="menu-title"><span>OVERVIEW</span></div>
       <div class="submenu">
         <button class="nav-item" [class.active]="activePage() === 'dashboard'" type="button" (click)="activePage.set('dashboard')"><span>◫</span><div><strong>Momentum Dashboard</strong><small>Strategy overview</small></div></button>

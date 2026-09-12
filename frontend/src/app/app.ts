@@ -24,6 +24,7 @@ interface HistoryItem { id: number; sourceKey: SourceKey; title: string; timeFra
 @Component({ selector: 'app-root', imports: [FormsModule, DatePipe, StockMasterComponent, ETFMasterComponent, IndexMasterComponent, NiftyIndexStockComponent, MomentumAnalysisComponent, MomentumDashboardComponent, MomentumBacktestComponent, MomentumRiskOverlayBacktestComponent, RiskAdjustedMomentumAnalysisComponent, RiskAdjustedMomentumBacktestComponent, TechnicalIndicatorComponent, MarketBreadthComponent, BreadthBacktestComponent], templateUrl: './app.html', styleUrl: './app.scss' })
 export class App {
   private readonly http = inject(HttpClient);
+  readonly mobileNavigationOpen = signal(false);
   readonly timeFrame = signal<TimeFrame>('DAILY');
   readonly loading = signal<Record<SourceKey, boolean>>({ stock: false, etf: false, index: false });
   readonly history = signal<HistoryItem[]>([]);
