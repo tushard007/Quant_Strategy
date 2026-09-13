@@ -2,7 +2,7 @@ import { DatePipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { finalize } from 'rxjs';
+import { exhaustMap, filter, finalize, retry, switchMap, take, timer } from 'rxjs';
 import { StockMasterComponent } from './stock-master/stock-master.component';
 import { ETFMasterComponent } from './etf-master/etf-master.component';
 import { IndexMasterComponent } from './index-master/index-master.component';
@@ -20,6 +20,7 @@ type TimeFrame = 'DAILY' | 'WEEKLY';
 type SourceKey = 'stock' | 'etf' | 'index';
 type AppTheme = 'forest' | 'ocean' | 'slate' | 'contrast';
 interface PriceSource { key: SourceKey; title: string; shortTitle: string; description: string; path: string; icon: string; }
+interface PriceUpdateJob { id: string; status: 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED'; message: string; }
 interface HistoryItem { id: number; sourceKey: SourceKey; title: string; timeFrame: TimeFrame; success: boolean; message: string; completedAt: Date; }
 @Component({ selector: 'app-root', imports: [FormsModule, DatePipe, StockMasterComponent, ETFMasterComponent, IndexMasterComponent, NiftyIndexStockComponent, MomentumAnalysisComponent, MomentumDashboardComponent, MomentumBacktestComponent, MomentumRiskOverlayBacktestComponent, RiskAdjustedMomentumAnalysisComponent, RiskAdjustedMomentumBacktestComponent, TechnicalIndicatorComponent, MarketBreadthComponent, BreadthBacktestComponent], templateUrl: './app.html', styleUrl: './app.scss' })
 export class App {
@@ -38,8 +39,19 @@ export class App {
     { key: 'index', title: 'Index Prices', shortTitle: 'indices', description: 'Refresh historical price data for configured market indices.', path: 'index-Price', icon: '⌁' }
   ];
   sync(source: PriceSource, selectedTimeFrame = this.timeFrame()): void {
+    if (this.loading()[source.key]) return;
     this.loading.update(value => ({ ...value, [source.key]: true })); this.notice.set(null);
-    this.http.post(`/api/price-data/${source.path}/${selectedTimeFrame}`, null, { responseType: 'text' }).pipe(finalize(() => this.loading.update(value => ({ ...value, [source.key]: false })))).subscribe({ next: () => this.record(source, selectedTimeFrame, true, `${source.title} are now up to date.`), error: error => this.record(source, selectedTimeFrame, false, error?.error?.message || error?.error || 'The server could not complete the update.') });
+    this.http.post<PriceUpdateJob>(`/api/price-data/jobs/${source.path}/${selectedTimeFrame}`, null).pipe(
+      switchMap(job => timer(0, 2000).pipe(
+        exhaustMap(() => this.http.get<PriceUpdateJob>(`/api/price-data/jobs/${job.id}`).pipe(retry({ count: 3, delay: 2000 }))),
+        filter(status => status.status === 'SUCCEEDED' || status.status === 'FAILED'),
+        take(1)
+      )),
+      finalize(() => this.loading.update(value => ({ ...value, [source.key]: false })))
+    ).subscribe({
+      next: job => this.record(source, selectedTimeFrame, job.status === 'SUCCEEDED', job.message),
+      error: () => this.record(source, selectedTimeFrame, false, 'Could not retrieve update status. The update may still be running; retry to reconnect.')
+    });
   }
   syncAll(): void { this.sources.forEach(source => this.sync(source)); }
   retry(item: HistoryItem): void { const source = this.sources.find(value => value.key === item.sourceKey); if (source) this.sync(source, item.timeFrame); }
