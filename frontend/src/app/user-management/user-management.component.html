@@ -1,0 +1,45 @@
+<header>
+  <div><p class="eyebrow">ADMINISTRATION</p><h1>Users</h1><p>{{ auth.isSuperadmin() ? 'Manage all administrator and user accounts.' : 'Manage User accounts. Administrator access is managed by a Superadmin.' }}</p></div>
+  <button type="button" (click)="refresh()" [disabled]="loading() || saving()">Refresh</button>
+</header>
+@if (error()) { <p class="message error" role="alert">{{ error() }}</p> }
+@if (message()) { <p class="message" role="status">{{ message() }}</p> }
+<section class="account-form" aria-labelledby="account-form-title">
+  <h2 id="account-form-title">{{ editing() ? 'Edit account' : 'Create account' }}</h2>
+  <form #form="ngForm" (ngSubmit)="save()">
+    <label>Email address
+      <input type="email" name="email" [(ngModel)]="email" required email maxlength="254"
+        autocomplete="off" [disabled]="!!editing() || saving()" />
+    </label>
+    <label>Role
+      <select name="role" [(ngModel)]="role" [disabled]="saving()"><option value="USER">User — Analysis access</option>@if (auth.isSuperadmin()) {<option value="ADMIN">Admin — Application and User management</option><option value="SUPERADMIN">Superadmin — Full account management</option>}</select>
+    </label>
+    <label>{{ editing() ? 'New password (optional)' : 'Password' }}
+      <input type="password" name="password" [(ngModel)]="password" [required]="!editing()"
+        minlength="12" maxlength="72" autocomplete="new-password" [disabled]="saving()" />
+      <small>{{ editing() ? 'Leave blank to keep the current password.' : 'At least 12 characters; maximum 72 UTF-8 bytes.' }}</small>
+    </label>
+    @if (editing()) {
+      <label class="checkbox"><input type="checkbox" name="enabled" [(ngModel)]="enabled" [disabled]="saving()" /> Account enabled</label>
+    }
+    <div class="actions">
+      <button class="primary" type="submit" [disabled]="form.invalid || saving()">{{ saving() ? 'Saving…' : editing() ? 'Save changes' : 'Create account' }}</button>
+      @if (editing()) { <button type="button" (click)="reset()" [disabled]="saving()">Cancel edit</button> }
+    </div>
+  </form>
+</section>
+<section class="accounts" aria-label="User accounts">
+  <h2>Accounts</h2>
+  @if (loading()) { <p role="status">Loading accounts…</p> }
+  @else if (!accounts().length) { <p>No accounts available.</p> }
+  @else {
+    <div class="table-wrap"><table><thead><tr><th>Email</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
+      <tbody>@for (account of accounts(); track account.id) {
+        <tr><td>{{ account.email }} @if (account.email === auth.user()?.username) { <small>(you)</small> }</td>
+          <td>{{ roleLabel(account.role) }}</td><td>{{ account.enabled ? 'Enabled' : 'Disabled' }}</td>
+          <td>{{ account.createdAt | date:'mediumDate' }}</td>
+          <td><button type="button" (click)="edit(account)" [disabled]="saving() || !canManage(account)" [attr.aria-label]="'Edit ' + account.email">Edit</button></td></tr>
+      }</tbody>
+    </table></div>
+  }
+</section>
