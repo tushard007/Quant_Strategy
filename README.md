@@ -29,3 +29,29 @@ This project focuses on the analysis and evaluation of different quantitative tr
 
 ## Future Enhancements   
 - Visualization tools for better insight into strategy performance.  
+
+## Cloud Run container releases
+
+Cloud Run requires `linux/amd64`, including when building on an ARM64 Mac.
+Build and push with an explicit platform and a new tag for each release:
+
+```sh
+IMAGE="docker.io/tushardesarda/quant-strategy:cloudrun-$(date -u +%Y%m%d-%H%M%S)"
+docker buildx build --platform linux/amd64 --tag "$IMAGE" --push .
+docker buildx imagetools inspect "$IMAGE"
+```
+
+Authenticate with `docker login` before pushing. Verify that the published
+manifest includes `linux/amd64`, then deploy that exact image tag to the existing
+Cloud Run service, retaining its production environment and database settings.
+An OCI image index is supported when it includes `linux/amd64`; an ARM-only index
+cannot run on Cloud Run. Use a fresh release tag instead of reusing `latest`.
+
+The existing `cloudbuild.yaml` deploys to App Engine, not Cloud Run.
+
+For stock/ETF chunked imports, persistent progress, and Cloud Run Job deployment,
+see [Price imports](docs/price-imports.md).
+
+## Authentication and roles
+
+Momentum Dashboard is public. Accounts sign in with email addresses. Administrators have all menus and an Administration → Users screen to create accounts, assign Admin/User roles, reset passwords, and disable access. Users have Analysis menus. Password hashes and the automatically generated JWT signing key are persisted in the database. See [JWT/RBAC setup and API usage](docs/JWT_RBAC.md) for the one-time first-admin setup and migration instructions.

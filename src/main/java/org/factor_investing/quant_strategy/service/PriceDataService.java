@@ -46,6 +46,14 @@ public class PriceDataService {
     private final NSE_StockDataService nseStockDataService;
     private final UpstoxHistoricalDataService upstoxHistoricalDataService;
     private final ApplicationEventPublisher eventPublisher;
+    private final PriceImportPersistence persistence;
+
+    @org.springframework.beans.factory.annotation.Value("${price-data.import.chunk-size:25}")
+    private int importChunkSize = 25;
+
+    @org.springframework.beans.factory.annotation.Value("${price-data.import.request-delay-ms:300}")
+    private long importRequestDelayMs = 300;
+
 
     public PriceDataService(
             StockDataRepository stockPriceDataRepository,
@@ -54,7 +62,8 @@ public class PriceDataService {
             NSEIndexMasterDataRepository nseIndexMasterDataRepository,
             NSE_StockDataService nseStockDataService,
             UpstoxHistoricalDataService upstoxHistoricalDataService,
-            ApplicationEventPublisher eventPublisher
+            ApplicationEventPublisher eventPublisher,
+            PriceImportPersistence persistence
     ) {
         this.stockPriceDataRepository = stockPriceDataRepository;
         this.etfPriceDataRepository = etfPriceDataRepository;
@@ -63,523 +72,31 @@ public class PriceDataService {
         this.nseStockDataService = nseStockDataService;
         this.upstoxHistoricalDataService = upstoxHistoricalDataService;
         this.eventPublisher = eventPublisher;
+        this.persistence = persistence;
     }
 
     public String saveOrUpdateStockPriceData(PriceFrequencey timeFrame) throws ParseException {
-
-        List<JGetHistoricalCandleResponse> result = new ArrayList<>();
-
-        LocalDate currentDate = LocalDate.now();
-        currentDate = DateUtil.getFridayDateIfWeekend(currentDate);
-
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-
-        String toDate = currentDate.format(formatter);
-
-        LocalDate beforeYearDate = MAXIMUM_HISTORY_START_DATE;
-
-        String fromDate = beforeYearDate.format(formatter);
-
-        String interval = PriceFrequencey.WEEKLY.equals(timeFrame) ? "weeks" : "days";
-
-        List<NSEStockMasterData> stockDataList = nseStockDataService.getAllStockData();
-
-        /*
-         * Create stock map once to avoid O(n²) lookup
-         */
-        Map<String, NSEStockMasterData> stockMap =
-                stockDataList.stream()
-                        .filter(s -> s.getSymbol() != null)
-                        .collect(Collectors.toMap(
-                                s -> s.getSymbol().toLowerCase(),
-                                Function.identity(),
-                                (a, b) -> a
-                        ));
-
-        /*
-         * Sequential processing with throttling
-         */
-        for (int i = 0; i < stockDataList.size(); i++) {
-
-            NSEStockMasterData stockData = stockDataList.get(i);
-
-            String instrumentKey = "NSE_EQ|" + stockData.getIsinNumber();
-
-            String stockName = stockData.getNameOfCompany();
-
-            log.info("Fetching historical candle data for stock: {} ({}/{})", stockName, i + 1, stockDataList.size());
-
-            /*
-             * Batch cooldown
-             */
-            if (i > 0 && i % 200 == 0) {
-
-                try {
-
-                    log.info("Cooling down after {} API calls", i);
-
-                    Thread.sleep(5000);
-
-                } catch (InterruptedException e) {
-
-                    Thread.currentThread().interrupt();
-
-                    log.error("Thread interrupted during cooldown", e);
-                }
-            }
-
-            GetHistoricalCandleResponse response =
-                    fetchHistoricalDataWithRetry(
-                            instrumentKey,
-                            interval,
-                            toDate,
-                            fromDate
-                    );
-
-            /*
-             * Small delay after every request
-             */
-            try {
-                Thread.sleep(300);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-
-            if (response != null
-                    && response.getData() != null
-                    && response.getData().getCandles() != null
-                    && !response.getData().getCandles().isEmpty()) {
-
-                log.info("Successfully fetched data for stock: {}", stockName);
-
-                result.add(getJavaObjectHistoricalData(response, stockData.getNameOfCompany(), stockData.getSymbol()));
-
-            } else {
-                log.warn("No data found for stock: {}", stockName);
-            }
-        }
-
-        List<JGetHistoricalCandleResponse> historicalData = result.stream().toList();
-
-        if (historicalData.isEmpty()) {
-
-            log.warn("No historical data found for stocks");
-
-            return "No stock historical data found";
-        }
-
-        Map<String, List<JGetHistoricalCandleResponse.CandleData>> stockDataMap =
-                historicalData.stream()
-                        .collect(Collectors.toMap(
-                                JGetHistoricalCandleResponse::getSymbol,
-                                JGetHistoricalCandleResponse::getData
-                        ));
-
-        List<StockPricesJson> existingList =
-                stockPriceDataRepository.findAll();
-        sanitizeStoredStockPrices(existingList);
-
-        /*
-         * Existing DB records map
-         */
-        Map<String, StockPricesJson> existingMap =
-                existingList.stream()
-                        .filter(Objects::nonNull)
-                        .filter(item -> item.getTimeFrame() == timeFrame)
-                        .filter(spj ->
-                                spj.getNseStockMasterData() != null
-                                        && spj.getNseStockMasterData().getSymbol() != null
-                        )
-                        .collect(Collectors.toMap(
-                                spj -> spj.getNseStockMasterData()
-                                        .getSymbol()
-                                        .toLowerCase(),
-                                Function.identity(),
-                                (a, b) -> a
-                        ));
-
-        List<StockPricesJson> toSave = new ArrayList<>();
-
-        for (Map.Entry<String,
-                List<JGetHistoricalCandleResponse.CandleData>> entry : stockDataMap.entrySet()) {
-
-            String symbol = entry.getKey();
-
-            List<JGetHistoricalCandleResponse.CandleData> candleDataList = entry.getValue();
-
-            StockPricesJson stockPricesJson =
-                    existingMap.getOrDefault(
-                            symbol.toLowerCase(),
-                            new StockPricesJson()
-                    );
-
-            NSEStockMasterData stockMasterData =
-                    stockMap.get(symbol.toLowerCase());
-
-            stockPricesJson.setNseStockMasterData(stockMasterData);
-
-            stockPricesJson.setTimeFrame(timeFrame);
-
-            stockPricesJson.setOhlcvData(
-                    mergeOhlcvData(stockPricesJson.getOhlcvData(), candleDataList)
-            );
-
-            toSave.add(stockPricesJson);
-        }
-
-        stockPriceDataRepository.saveAll(toSave);
-        publishPriceDataChanged(AssetDataType.STOCK);
-
-        log.info("Created stock price data list with {} entries.", toSave.size()
-        );
-
-        return "Successfully saved stock price data to DB with size: " + toSave.size();
+        List<NSEStockMasterData> symbols = nseStockDataService.getAllStockData();
+        return importPrices(symbols, timeFrame, AssetDataType.STOCK,
+                NSEStockMasterData::getSymbol, NSEStockMasterData::getNameOfCompany,
+                NSEStockMasterData::getIsinNumber,
+                batch -> stockPriceDataRepository.findAllByTimeFrameAndNseStockMasterData_SymbolIn(timeFrame, batch),
+                row -> row.getNseStockMasterData().getSymbol(), StockPricesJson::getOhlcvData,
+                (master, existing, candles) -> {
+                    StockPricesJson row = existing == null ? new StockPricesJson() : existing;
+                    row.setNseStockMasterData(master);
+                    row.setTimeFrame(timeFrame);
+                    row.setOhlcvData(mergeOhlcvData(row.getOhlcvData(), candles));
+                    return row;
+                }, persistence::saveStocks);
     }
 
     public String updateStockPriceDataFromLastDate() throws ParseException {
-
-        PriceFrequencey timeFrame = PriceFrequencey.DAILY;
-
-        LocalDate currentDate = DateUtil.getFridayDateIfWeekend(LocalDate.now());
-
-        String toDate = currentDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-
-        String interval = "days";
-
-        LocalDate historyStartDate = MAXIMUM_HISTORY_START_DATE;
-
-        List<StockPricesJson> existingList =
-                stockPriceDataRepository.findAll();
-        sanitizeStoredStockPrices(existingList);
-
-        if (existingList == null || existingList.isEmpty()) {
-
-            log.info("No existing stock price data found. Running full daily stock price update.");
-
-            return saveOrUpdateStockPriceData(timeFrame);
-        }
-
-        Map<String, StockPricesJson> existingMap =
-                existingList.stream()
-                        .filter(Objects::nonNull)
-                        .filter(item -> item.getTimeFrame() == timeFrame)
-                        .filter(spj ->
-                                spj.getNseStockMasterData() != null
-                                        && spj.getNseStockMasterData().getSymbol() != null
-                        )
-                        .collect(Collectors.toMap(
-                                spj -> spj.getNseStockMasterData()
-                                        .getSymbol()
-                                        .toLowerCase(),
-                                Function.identity(),
-                                (a, b) -> a
-                        ));
-
-        List<NSEStockMasterData> stockDataList = nseStockDataService.getAllStockData();
-
-        List<StockPricesJson> toSave = new ArrayList<>();
-
-        int skippedCount = 0;
-
-        for (int i = 0; i < stockDataList.size(); i++) {
-
-            NSEStockMasterData stockData = stockDataList.get(i);
-
-            if (stockData.getSymbol() == null) {
-
-                continue;
-            }
-
-            StockPricesJson stockPricesJson =
-                    existingMap.get(stockData.getSymbol().toLowerCase());
-
-            Optional<LocalDate> lastPriceDate =
-                    getLastPriceDate(stockPricesJson);
-
-            if (lastPriceDate.isPresent()
-                    && !lastPriceDate.get().isBefore(currentDate)) {
-
-                skippedCount++;
-
-                continue;
-            }
-
-            String fromDate = lastPriceDate.map(date -> date.plusDays(1))
-                    .orElse(historyStartDate).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-
-            String instrumentKey = "NSE_EQ|" + stockData.getIsinNumber();
-
-            log.info(
-                    "Fetching incremental stock price update for stock: {} from {} to {} ({}/{})",
-                    stockData.getNameOfCompany(),
-                    fromDate,
-                    toDate,
-                    i + 1,
-                    stockDataList.size()
-            );
-
-            if (i > 0 && i % 200 == 0) {
-
-                try {
-
-                    log.info("Cooling down after {} startup stock API calls", i);
-
-                    Thread.sleep(5000);
-
-                } catch (InterruptedException e) {
-
-                    Thread.currentThread().interrupt();
-
-                    log.error("Thread interrupted during startup stock update cooldown", e);
-
-                    break;
-                }
-            }
-
-            GetHistoricalCandleResponse response =
-                    fetchHistoricalDataWithRetry(
-                            instrumentKey,
-                            interval,
-                            toDate,
-                            fromDate
-                    );
-
-            try {
-
-                Thread.sleep(300);
-
-            } catch (InterruptedException e) {
-
-                Thread.currentThread().interrupt();
-
-                log.error("Thread interrupted during startup stock update delay", e);
-
-                break;
-            }
-
-            if (response == null
-                    || response.getData() == null
-                    || response.getData().getCandles() == null
-                    || response.getData().getCandles().isEmpty()) {
-
-                log.warn("No startup update data found for stock: {}", stockData.getNameOfCompany());
-
-                continue;
-            }
-
-            JGetHistoricalCandleResponse historicalData =
-                    getJavaObjectHistoricalData(
-                            response,
-                            stockData.getNameOfCompany(),
-                            stockData.getSymbol()
-                    );
-
-            StockPricesJson updatedStockPricesJson =
-                    stockPricesJson != null ? stockPricesJson : new StockPricesJson();
-
-            updatedStockPricesJson.setNseStockMasterData(stockData);
-
-            updatedStockPricesJson.setTimeFrame(timeFrame);
-
-            updatedStockPricesJson.setOhlcvData(
-                    mergeOhlcvData(
-                            updatedStockPricesJson.getOhlcvData(),
-                            historicalData.getData()
-                    )
-            );
-
-            toSave.add(updatedStockPricesJson);
-        }
-
-        if (!toSave.isEmpty()) {
-
-            stockPriceDataRepository.saveAll(toSave);
-            publishPriceDataChanged(AssetDataType.STOCK);
-        }
-
-        log.info(
-                "Startup stock price update completed. Updated: {}, skipped current: {}",
-                toSave.size(),
-                skippedCount
-        );
-
-        return "Startup stock price update completed. Updated: "
-                + toSave.size()
-                + ", skipped current: "
-                + skippedCount;
+        return saveOrUpdateStockPriceData(PriceFrequencey.DAILY);
     }
 
     public String updateETFPriceDataFromLastDate() throws ParseException {
-
-        PriceFrequencey timeFrame = PriceFrequencey.DAILY;
-
-        LocalDate currentDate = DateUtil.getFridayDateIfWeekend(LocalDate.now());
-
-        String toDate = currentDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-
-        String interval = "days";
-
-        LocalDate historyStartDate = MAXIMUM_HISTORY_START_DATE;
-
-        List<ETFPricesJson> existingList =
-                etfPriceDataRepository.findAll();
-        sanitizeStoredETFPrices(existingList);
-
-        if (existingList == null || existingList.isEmpty()) {
-
-            log.info("No existing ETF price data found. Running full daily ETF price update.");
-
-            return saveOrUpdateETFPriceData(timeFrame);
-        }
-
-        Map<String, ETFPricesJson> existingMap =
-                existingList.stream()
-                        .filter(Objects::nonNull)
-                        .filter(item -> item.getTimeFrame() == timeFrame)
-                        .filter(etfPricesJson ->
-                                etfPricesJson.getNseETFMasterData() != null
-                                        && etfPricesJson.getNseETFMasterData().getSymbol() != null
-                        )
-                        .collect(Collectors.toMap(
-                                etfPricesJson -> etfPricesJson.getNseETFMasterData()
-                                        .getSymbol()
-                                        .toLowerCase(),
-                                Function.identity(),
-                                (a, b) -> a
-                        ));
-
-        List<NSE_ETFMasterData> indexDataList = upstoxHistoricalDataService.getNSEIndexData();
-
-        List<ETFPricesJson> toSave = new ArrayList<>();
-
-        int skippedCount = 0;
-
-        for (int i = 0; i < indexDataList.size(); i++) {
-
-            NSE_ETFMasterData indexData = indexDataList.get(i);
-
-            if (indexData.getSymbol() == null) {
-
-                continue;
-            }
-
-            ETFPricesJson etfPricesJson =
-                    existingMap.get(indexData.getSymbol().toLowerCase());
-
-            Optional<LocalDate> lastPriceDate =
-                    getLastPriceDate(etfPricesJson);
-
-            if (lastPriceDate.isPresent()
-                    && !lastPriceDate.get().isBefore(currentDate)) {
-
-                skippedCount++;
-
-                continue;
-            }
-
-            String fromDate = lastPriceDate.map(date -> date.plusDays(1))
-                    .orElse(historyStartDate).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-
-            String instrumentKey = "NSE_EQ|" + indexData.getIsinNumber();
-
-            log.info(
-                    "Fetching incremental ETF price update for ETF: {} from {} to {} ({}/{})",
-                    indexData.getSecurityName(),
-                    fromDate,
-                    toDate,
-                    i + 1,
-                    indexDataList.size()
-            );
-
-            if (i > 0 && i % 150 == 0) {
-
-                try {
-
-                    log.info("Cooling down after {} startup ETF API calls", i);
-
-                    Thread.sleep(5000);
-
-                } catch (InterruptedException e) {
-
-                    Thread.currentThread().interrupt();
-
-                    log.error("Thread interrupted during startup ETF update cooldown", e);
-
-                    break;
-                }
-            }
-
-            GetHistoricalCandleResponse response =
-                    fetchHistoricalDataWithRetry(
-                            instrumentKey,
-                            interval,
-                            toDate,
-                            fromDate
-                    );
-
-            try {
-
-                Thread.sleep(200);
-
-            } catch (InterruptedException e) {
-
-                Thread.currentThread().interrupt();
-
-                log.error("Thread interrupted during startup ETF update delay", e);
-
-                break;
-            }
-
-            if (response == null
-                    || response.getData() == null
-                    || response.getData().getCandles() == null
-                    || response.getData().getCandles().isEmpty()) {
-
-                log.warn("No startup update data found for ETF: {}", indexData.getSecurityName());
-
-                continue;
-            }
-
-            JGetHistoricalCandleResponse historicalData =
-                    getJavaObjectHistoricalData(
-                            response,
-                            indexData.getSecurityName(),
-                            indexData.getSymbol()
-                    );
-
-            ETFPricesJson updatedETFPricesJson =
-                    etfPricesJson != null ? etfPricesJson : new ETFPricesJson();
-
-            updatedETFPricesJson.setNseETFMasterData(indexData);
-
-            updatedETFPricesJson.setTimeFrame(timeFrame);
-
-            updatedETFPricesJson.setOhlcvData(
-                    mergeOhlcvData(
-                            updatedETFPricesJson.getOhlcvData(),
-                            historicalData.getData()
-                    )
-            );
-
-            toSave.add(updatedETFPricesJson);
-        }
-
-        if (!toSave.isEmpty()) {
-
-            etfPriceDataRepository.saveAll(toSave);
-            publishPriceDataChanged(AssetDataType.ETF);
-        }
-
-        log.info(
-                "Startup ETF price update completed. Updated: {}, skipped current: {}",
-                toSave.size(),
-                skippedCount
-        );
-
-        return "Startup ETF price update completed. Updated: "
-                + toSave.size()
-                + ", skipped current: "
-                + skippedCount;
+        return saveOrUpdateETFPriceData(PriceFrequencey.DAILY);
     }
 
     public String saveOrUpdateIndexPriceData(PriceFrequencey timeFrame)
@@ -1016,7 +533,8 @@ public class PriceDataService {
                     instrumentKey, chunkFrom, chunkTo);
             GetHistoricalCandleResponse chunk = fetchSingleHistoricalRangeWithRetry(instrumentKey, interval,
                     chunkTo.toString(), chunkFrom.toString());
-            if (chunk != null && chunk.getData() != null && chunk.getData().getCandles() != null) {
+            if (chunk == null || chunk.getData() == null || chunk.getData().getCandles() == null) return null;
+            if (chunk.getData().getCandles() != null) {
                 if (combined == null) combined = chunk;
                 else combined.getData().getCandles().addAll(chunk.getData().getCandles());
             }
@@ -1031,6 +549,7 @@ public class PriceDataService {
 
         int maxRetries = 5;
         for (int retry = 0; retry < maxRetries; retry++) {
+            checkImportInterrupted();
             try {
                 GetHistoricalCandleResponse response = upstoxHistoricalDataService
                         .getHistoricalCandleData(
@@ -1067,201 +586,130 @@ public class PriceDataService {
         }
     }
 
-    public String saveOrUpdateETFPriceData(PriceFrequencey timeFrame)
-            throws ParseException {
-
-        List<JGetHistoricalCandleResponse> result =
-                new ArrayList<>();
-
-        LocalDate currentDate = LocalDate.now();
-
-        currentDate = DateUtil.getFridayDateIfWeekend(currentDate);
-
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-
-        String toDate = currentDate.format(formatter);
-
-        LocalDate beforeYearDate = MAXIMUM_HISTORY_START_DATE;
-
-        String fromDate = beforeYearDate.format(formatter);
-
-        String interval = PriceFrequencey.WEEKLY.equals(timeFrame) ? "weeks" : "days";
-
-        List<NSE_ETFMasterData> indexDataList = upstoxHistoricalDataService.getNSEIndexData();
-
-        /*
-         * ETF map for O(1) lookup
-         */
-        Map<String, NSE_ETFMasterData> etfMap =
-                indexDataList.stream()
-                        .filter(e -> e.getSymbol() != null)
-                        .collect(Collectors.toMap(
-                                e -> e.getSymbol().toLowerCase(),
-                                Function.identity(),
-                                (a, b) -> a
-                        ));
-
-        /*
-         * Sequential processing with throttling
-         */
-        for (int i = 0; i < indexDataList.size(); i++) {
-
-            NSE_ETFMasterData indexData = indexDataList.get(i);
-
-            String instrumentKey = "NSE_EQ|" + indexData.getIsinNumber();
-
-            String stockName = indexData.getSecurityName();
-
-            log.info("Fetching historical candle data for ETF: {} ({}/{})", stockName, i + 1, indexDataList.size()
-            );
-
-            /*
-             * Batch cooldown after every 150 requests
-             */
-            if (i > 0 && i % 150 == 0) {
-
-                try {
-
-                    log.info("Cooling down after {} ETF API calls", i);
-
-                    Thread.sleep(5000);
-
-                } catch (InterruptedException e) {
-
-                    Thread.currentThread().interrupt();
-
-                    log.error("Thread interrupted during cooldown", e);
-                }
-            }
-
-            GetHistoricalCandleResponse response =
-                    fetchHistoricalDataWithRetry(
-                            instrumentKey,
-                            interval,
-                            toDate,
-                            fromDate
-                    );
-
-            /*
-             * Small delay after every request
-             */
-            try {
-
-                Thread.sleep(200);
-
-            } catch (InterruptedException e) {
-
-                Thread.currentThread().interrupt();
-            }
-
-            if (response != null
-                    && response.getData() != null
-                    && response.getData().getCandles() != null
-                    && !response.getData().getCandles().isEmpty()) {
-
-                log.info("Successfully fetched data for ETF: {}", stockName);
-
-                result.add(
-                        getJavaObjectHistoricalData(
-                                response,
-                                indexData.getSecurityName(),
-                                indexData.getSymbol()
-                        )
-                );
-
-            } else {
-
-                log.warn("No data found for ETF: {}", stockName);
-            }
-        }
-
-        List<JGetHistoricalCandleResponse> historicalData = result.stream().toList();
-
-        if (historicalData.isEmpty()) {
-
-            log.warn("No ETF historical data found");
-
-            return "No ETF historical data found";
-        }
-
-        Map<String,
-                List<JGetHistoricalCandleResponse.CandleData>>
-                stockDataMap =
-                historicalData.stream()
-                        .collect(Collectors.toMap(
-                                JGetHistoricalCandleResponse::getSymbol,
-                                JGetHistoricalCandleResponse::getData
-                        ));
-
-        List<ETFPricesJson> existingList =
-                etfPriceDataRepository.findAll();
-        sanitizeStoredETFPrices(existingList);
-
-        /*
-         * Existing ETF DB records map
-         */
-        Map<String, ETFPricesJson> existingMap =
-                existingList.stream()
-                        .filter(Objects::nonNull)
-                        .filter(item -> item.getTimeFrame() == timeFrame)
-                        .filter(etfPricesJson ->
-                                etfPricesJson.getNseETFMasterData() != null
-                                        && etfPricesJson.getNseETFMasterData()
-                                        .getSymbol() != null
-                        )
-                        .collect(Collectors.toMap(
-                                etfPricesJson -> etfPricesJson.getNseETFMasterData()
-                                        .getSymbol()
-                                        .toLowerCase(),
-                                Function.identity(),
-                                (a, b) -> a
-                        ));
-
-        List<ETFPricesJson> toSave =
-                new ArrayList<>();
-
-        for (Map.Entry<String,
-                List<JGetHistoricalCandleResponse.CandleData>>
-                entry : stockDataMap.entrySet()) {
-
-            String symbol = entry.getKey();
-
-            List<JGetHistoricalCandleResponse.CandleData>
-                    candleDataList = entry.getValue();
-
-            ETFPricesJson etfPricesJson =
-                    existingMap.getOrDefault(
-                            symbol.toLowerCase(),
-                            new ETFPricesJson()
-                    );
-
-            NSE_ETFMasterData nseETFMasterData =
-                    etfMap.get(symbol.toLowerCase());
-
-            etfPricesJson.setNseETFMasterData(
-                    nseETFMasterData
-            );
-
-            etfPricesJson.setTimeFrame(timeFrame);
-
-            etfPricesJson.setOhlcvData(
-                    mergeOhlcvData(etfPricesJson.getOhlcvData(), candleDataList)
-            );
-
-            toSave.add(etfPricesJson);
-        }
-
-        etfPriceDataRepository.saveAll(toSave);
-        publishPriceDataChanged(AssetDataType.ETF);
-
-        log.info(
-                "Created ETF price data list with {} entries.",
-                toSave.size()
-        );
-
-        return "Successfully saved ETF price data to DB with size: "
-                + toSave.size();
+    public String saveOrUpdateETFPriceData(PriceFrequencey timeFrame) throws ParseException {
+        List<NSE_ETFMasterData> symbols = upstoxHistoricalDataService.getNSEIndexData();
+        return importPrices(symbols, timeFrame, AssetDataType.ETF,
+                NSE_ETFMasterData::getSymbol, NSE_ETFMasterData::getSecurityName,
+                NSE_ETFMasterData::getIsinNumber,
+                batch -> etfPriceDataRepository.findAllByTimeFrameAndNseETFMasterData_SymbolIn(timeFrame, batch),
+                row -> row.getNseETFMasterData().getSymbol(), ETFPricesJson::getOhlcvData,
+                (master, existing, candles) -> {
+                    ETFPricesJson row = existing == null ? new ETFPricesJson() : existing;
+                    row.setNseETFMasterData(master);
+                    row.setTimeFrame(timeFrame);
+                    row.setOhlcvData(mergeOhlcvData(row.getOhlcvData(), candles));
+                    return row;
+                }, persistence::saveEtfs);
     }
+
+    @FunctionalInterface
+    private interface PriceMerger<M, P> {
+        P merge(M master, P existing, List<JGetHistoricalCandleResponse.CandleData> candles) throws ParseException;
+    }
+
+    private <M, P> String importPrices(
+            List<M> masters, PriceFrequencey timeFrame, AssetDataType asset,
+            Function<M, String> symbol, Function<M, String> name, Function<M, String> isin,
+            Function<List<String>, List<P>> load, Function<P, String> storedSymbol,
+            Function<P, List<OHLCV>> bars, PriceMerger<M, P> merge,
+            java.util.function.Consumer<List<P>> save) throws ParseException {
+        if (importChunkSize < 1 || importRequestDelayMs < 0) {
+            throw new IllegalArgumentException("Import chunk size must be positive and request delay nonnegative");
+        }
+        LocalDate to = DateUtil.getFridayDateIfWeekend(LocalDate.now(java.time.ZoneId.of("Asia/Kolkata")));
+        String interval = timeFrame == PriceFrequencey.WEEKLY ? "weeks" : "days";
+        int saved = 0;
+        List<String> failures = new ArrayList<>();
+        // Only the current chunk's JSON histories are loaded into memory.
+        try (var lock = persistence.acquireLock(asset, timeFrame)) {
+            for (int offset = 0; offset < masters.size(); offset += importChunkSize) {
+                checkImportInterrupted();
+                lock.checkHeld();
+                List<M> batch = masters.subList(offset, Math.min(offset + importChunkSize, masters.size()));
+                Map<String, P> existing = load.apply(batch.stream().map(symbol).filter(Objects::nonNull).toList())
+                        .stream().collect(Collectors.toMap(storedSymbol, Function.identity(), (first, second) -> first));
+                List<P> pending = new ArrayList<>();
+                for (M master : batch) {
+                    checkImportInterrupted();
+                    String ticker = symbol.apply(master);
+                    if (ticker == null || isin.apply(master) == null) {
+                        failures.add(ticker == null ? "<missing-symbol>" : ticker);
+                        continue;
+                    }
+                    P row = existing.get(ticker);
+                    LocalDate from = incrementalStart(row == null ? null : bars.apply(row), timeFrame);
+                    if (from.isAfter(to)) continue;
+                    log.info("Importing {} {} from {} to {}", asset, ticker, from, to);
+                    GetHistoricalCandleResponse response = fetchHistoricalDataWithRetry(
+                            "NSE_EQ|" + isin.apply(master), interval, to.toString(), from.toString());
+                    if (response == null || response.getData() == null || response.getData().getCandles() == null) {
+                        failures.add(ticker);
+                    } else if (!response.getData().getCandles().isEmpty()) {
+                        try {
+                            pending.add(merge.merge(master, row,
+                                    getJavaObjectHistoricalData(response, name.apply(master), ticker).getData()));
+                        } catch (ParseException | RuntimeException exception) {
+                            failures.add(ticker);
+                            log.error("Cannot parse prices for {}", ticker, exception);
+                        }
+                    }
+                    pauseImportRequests();
+                }
+                // The persistence bean commits a separate transaction before we fetch the next chunk.
+                if (!pending.isEmpty()) {
+                    lock.checkHeld();
+                    try {
+                        save.accept(pending);
+                    } catch (RuntimeException exception) {
+                        failures.addAll(pending.stream().map(storedSymbol).toList());
+                        if (eventPublisher != null) eventPublisher.publishEvent(new PriceImportProgress(
+                                offset + batch.size(), masters.size(), saved, List.copyOf(failures)));
+                        throw exception;
+                    }
+                    saved += pending.size();
+                }
+                int processed = Math.min(offset + batch.size(), masters.size());
+                if (eventPublisher != null) eventPublisher.publishEvent(
+                        new PriceImportProgress(processed, masters.size(), saved, List.copyOf(failures)));
+                log.info("{} import committed: processed={}/{}, saved={}, failed={}",
+                        asset, processed, masters.size(), saved, failures.size());
+            }
+        } finally {
+            // Refresh once, including after partial failure, instead of reloading all history per chunk.
+            if (saved > 0) publishPriceDataChanged(asset);
+        }
+        if (!failures.isEmpty()) {
+            throw new IllegalStateException("Import partially completed; saved=" + saved + ", failed symbols=" + failures);
+        }
+        return "Successfully saved " + asset + " price data to DB with size: " + saved;
+    }
+
+    LocalDate incrementalStart(List<OHLCV> bars, PriceFrequencey timeFrame) {
+        LocalDate latest = bars == null ? MAXIMUM_HISTORY_START_DATE : bars.stream()
+                .filter(Objects::nonNull).map(OHLCV::getDate).filter(Objects::nonNull)
+                .map(DateUtil::convertDateToLocalDate).max(Comparator.naturalOrder())
+                .orElse(MAXIMUM_HISTORY_START_DATE);
+        // Refresh the last bar; it may have been fetched before the session/week closed.
+        return timeFrame == PriceFrequencey.WEEKLY && latest.isAfter(MAXIMUM_HISTORY_START_DATE)
+                ? latest.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+                : latest;
+    }
+
+    private void pauseImportRequests() {
+        try {
+            Thread.sleep(importRequestDelayMs);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Price import interrupted; committed chunks are retained", exception);
+        }
+    }
+
+    private void checkImportInterrupted() {
+        if (Thread.currentThread().isInterrupted()) {
+            throw new IllegalStateException("Price import interrupted; committed chunks are retained");
+        }
+    }
+
 
     public JGetHistoricalCandleResponse getJavaObjectHistoricalData(GetHistoricalCandleResponse apiResult, String stockName, String symbol) throws ParseException {
         JGetHistoricalCandleResponse convert = new JGetHistoricalCandleResponse();

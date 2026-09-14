@@ -33,7 +33,7 @@ public class LlmModelController {
     @Operation(summary = "Call configured LLM provider", security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
     @PostMapping("/complete")
     public ResponseEntity<LlmCompletionResponse> complete(
-            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestHeader(value = "X-Provider-Authorization", required = false) String authorization,
             @Valid @RequestBody LlmCompletionRequest request) {
         log.info("Calling {} model {}", request.getProvider(), request.getModel());
         return ResponseEntity.ok(llmModelService.complete(request, authorization));
@@ -41,13 +41,13 @@ public class LlmModelController {
 
     @Operation(
             summary = "Call ICA chat model using simple prompt form",
-            description = "Use Swagger Authorize to provide your ICA API key. Select model from dropdown and enter prompt text.",
+            description = "Use Swagger Authorize for your application JWT. Supply the ICA credential separately in X-Provider-Authorization.",
             security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
     )
     @PostMapping("/{namespace}/prompt")
     public ResponseEntity<Map<String, Object>> promptCompletion(
             @PathVariable String namespace,
-            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestHeader(value = "X-Provider-Authorization", required = false) String authorization,
             @Valid @RequestBody IcaPromptRequest request) {
         log.info("Calling ICA namespace {} prompt model {}", namespace, request.getModel());
         return ResponseEntity.ok(llmModelService.icaPromptCompletion(namespace, request, authorization));
@@ -57,7 +57,7 @@ public class LlmModelController {
     @PostMapping("/{namespace}/chat/completions")
     public ResponseEntity<Map<String, Object>> chatCompletion(
             @PathVariable String namespace,
-            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestHeader(value = "X-Provider-Authorization", required = false) String authorization,
             @Valid @RequestBody LlmCompletionRequest request) {
         log.info("Calling ICA namespace {} model {}", namespace, request.getModel());
         return ResponseEntity.ok(llmModelService.icaChatCompletion(namespace, request, authorization));
@@ -67,7 +67,7 @@ public class LlmModelController {
     @GetMapping("/{namespace}/models")
     public ResponseEntity<Map<String, Object>> listModels(
             @PathVariable String namespace,
-            @RequestHeader(value = "Authorization", required = false) String authorization) {
+            @RequestHeader(value = "X-Provider-Authorization", required = false) String authorization) {
         log.info("Listing ICA models for namespace {}", namespace);
         return ResponseEntity.ok(llmModelService.icaModels(namespace, authorization));
     }

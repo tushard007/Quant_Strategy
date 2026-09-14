@@ -1,0 +1,30 @@
+CREATE TABLE IF NOT EXISTS breadth_backtest_run (
+    id UUID PRIMARY KEY,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    run_type VARCHAR(32) NOT NULL,
+    status VARCHAR(16) NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    initial_capital DOUBLE PRECISION NOT NULL,
+    entry_rank INTEGER NOT NULL,
+    retention_rank INTEGER NOT NULL,
+    benchmark VARCHAR(255) NOT NULL,
+    breadth_universe VARCHAR(32) NOT NULL,
+    breadth_entry_mode VARCHAR(32),
+    breadth_score_cutoff DOUBLE PRECISION,
+    methodology VARCHAR(32) NOT NULL,
+    score_configuration_version INTEGER NOT NULL,
+    baseline_total_return DOUBLE PRECISION,
+    baseline_cagr DOUBLE PRECISION,
+    baseline_sharpe_ratio DOUBLE PRECISION,
+    baseline_maximum_drawdown DOUBLE PRECISION,
+    filtered_total_return DOUBLE PRECISION,
+    filtered_cagr DOUBLE PRECISION,
+    filtered_sharpe_ratio DOUBLE PRECISION,
+    filtered_maximum_drawdown DOUBLE PRECISION,
+    sample_count INTEGER,
+    error_message TEXT,
+    result JSONB NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_breadth_backtest_run_created_at ON breadth_backtest_run (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_breadth_backtest_run_type_created_at ON breadth_backtest_run (run_type, created_at DESC);

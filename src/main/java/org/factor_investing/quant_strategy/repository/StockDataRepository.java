@@ -9,4 +9,5 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface StockDataRepository extends JpaRepository<StockPricesJson, Long> {
     List<StockPricesJson> findAllByTimeFrame(PriceFrequencey timeFrame);
+    List<StockPricesJson> findAllByTimeFrameAndNseStockMasterData_SymbolIn(PriceFrequencey timeFrame, List<String> symbols);
 }

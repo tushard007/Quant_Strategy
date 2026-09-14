@@ -40,9 +40,7 @@ USER quantapp
 
 EXPOSE 8080
 
-ENV SPRING_PROFILES_ACTIVE=dev \
-    SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/factor_investing \
-    SPRING_DATASOURCE_USERNAME=tushardesarda \
+ENV SPRING_PROFILES_ACTIVE=prod \
     LOGGING_FILE_NAME=/app/logs/Quant_Strategy.log
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

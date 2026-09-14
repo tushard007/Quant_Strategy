@@ -27,6 +27,9 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 public class StockPriceCacheService {
+    @org.springframework.beans.factory.annotation.Value("${price-data.import.run:false}")
+    private boolean batchImport;
+
 
 
     private final StockDataService stockDataService;
@@ -149,12 +152,13 @@ public class StockPriceCacheService {
     private long lastETFCacheTime = 0L;
     private long lastIndexCacheTime = 0L;
 
-    // Set cache validity for 5 minutes.
-    private static final long CACHE_DURATION_MS = TimeUnit.MINUTES.toMillis(60);
+    // Other Cloud Run instances and batch jobs write outside this process.
+    @org.springframework.beans.factory.annotation.Value("${price-data.cache.ttl-ms:60000}")
+    private long cacheDurationMs = 60_000;
 
     @EventListener
     public void refreshChangedPriceCache(PriceDataChangedEvent event) {
-        if (event == null || event.assetDataType() == null) return;
+        if (batchImport || event == null || event.assetDataType() == null) return;
         switch (event.assetDataType()) {
             case STOCK -> refreshStockPriceDataCache();
             case ETF -> refreshETFPriceDataCache();
@@ -171,10 +175,11 @@ public class StockPriceCacheService {
      */
     @EventListener(ApplicationStartedEvent.class)
     public Map<String, List<OHLCV>> getCachedAllStockPriceData() {
+        if (batchImport) return Map.of();
         long currentTime = System.currentTimeMillis();
 
         // Check if the cache is populated and if it's still valid.
-        if (!stockDataCache.isEmpty() && (currentTime - lastStockCacheTime < CACHE_DURATION_MS)) {
+        if (!stockDataCache.isEmpty() && (currentTime - lastStockCacheTime < cacheDurationMs)) {
             log.info("Returning data from cache."); // For logging/debugging
             return stockDataCache;
         }
@@ -184,9 +189,10 @@ public class StockPriceCacheService {
 
     @EventListener(ApplicationStartedEvent.class)
     public Map<String, List<OHLCV>> getCachedAllETFPriceData() {
+        if (batchImport) return Map.of();
         long currentTime = System.currentTimeMillis();
 
-        if (!etfDataCache.isEmpty() && (currentTime - lastETFCacheTime < CACHE_DURATION_MS)) {
+        if (!etfDataCache.isEmpty() && (currentTime - lastETFCacheTime < cacheDurationMs)) {
             log.info("Returning ETF data from cache.");
             return etfDataCache;
         }
@@ -196,10 +202,11 @@ public class StockPriceCacheService {
 
     @EventListener(ApplicationStartedEvent.class)
     public Map<String, List<OHLCV>> getCachedAllIndexPriceData() {
+        if (batchImport) return Map.of();
         long currentTime = System.currentTimeMillis();
 
         // Check if the cache is populated and if it's still valid.
-        if (!indexDataCache.isEmpty() && (currentTime - lastIndexCacheTime < CACHE_DURATION_MS)) {
+        if (!indexDataCache.isEmpty() && (currentTime - lastIndexCacheTime < cacheDurationMs)) {
             log.info("Returning index data from cache."); // For logging/debugging
             return indexDataCache;
         }

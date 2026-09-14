@@ -9,4 +9,5 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ETFPriceDataRepository extends JpaRepository<ETFPricesJson, Long> {
     List<ETFPricesJson> findAllByTimeFrame(PriceFrequencey timeFrame);
+    List<ETFPricesJson> findAllByTimeFrameAndNseETFMasterData_SymbolIn(PriceFrequencey timeFrame, List<String> symbols);
 }

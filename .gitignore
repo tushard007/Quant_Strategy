@@ -32,3 +32,7 @@ build/
 ### VS Code ###
 .vscode/
 *.log
+
+# Local credentials; keep .env.example as the documented template.
+.env
+.env.local

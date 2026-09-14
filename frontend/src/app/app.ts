@@ -1,8 +1,11 @@
+import { UserManagementComponent } from './user-management/user-management.component';
+import { AuthService } from './auth/auth.service';
+import { LoginComponent } from './auth/login.component';
 import { DatePipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { exhaustMap, filter, finalize, retry, switchMap, take, timer } from 'rxjs';
+import { exhaustMap, filter, finalize, retry, switchMap, take, tap, timer } from 'rxjs';
 import { StockMasterComponent } from './stock-master/stock-master.component';
 import { ETFMasterComponent } from './etf-master/etf-master.component';
 import { IndexMasterComponent } from './index-master/index-master.component';
@@ -16,21 +19,41 @@ import { RiskAdjustedMomentumAnalysisComponent } from './risk-adjusted-momentum-
 import { RiskAdjustedMomentumBacktestComponent } from './risk-adjusted-momentum-backtest/risk-adjusted-momentum-backtest.component';
 import { MarketBreadthComponent } from './market-breadth/market-breadth.component';
 import { BreadthBacktestComponent } from './breadth-backtest/breadth-backtest.component';
+type Page = 'users' | 'dashboard' | 'login' | 'price' | 'stocks' | 'etfs' | 'indexes' | 'nifty-index-stock' | 'momentum' | 'momentum-backtest' | 'momentum-risk-overlay' | 'risk-adjusted-momentum' | 'risk-adjusted-momentum-backtest' | 'market-breadth' | 'breadth-backtest' | 'technical-indicator';
+const ADMIN_PAGES: readonly Page[] = ['users', 'price', 'stocks', 'etfs', 'indexes', 'nifty-index-stock'];
 type TimeFrame = 'DAILY' | 'WEEKLY';
 type SourceKey = 'stock' | 'etf' | 'index';
 type AppTheme = 'forest' | 'ocean' | 'slate' | 'contrast';
 interface PriceSource { key: SourceKey; title: string; shortTitle: string; description: string; path: string; icon: string; }
-interface PriceUpdateJob { id: string; status: 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED'; message: string; }
+interface PriceUpdateJob { id: string; status: 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED'; message: string; processed: number; total: number; saved: number; failedSymbols: string; }
 interface HistoryItem { id: number; sourceKey: SourceKey; title: string; timeFrame: TimeFrame; success: boolean; message: string; completedAt: Date; }
-@Component({ selector: 'app-root', imports: [FormsModule, DatePipe, StockMasterComponent, ETFMasterComponent, IndexMasterComponent, NiftyIndexStockComponent, MomentumAnalysisComponent, MomentumDashboardComponent, MomentumBacktestComponent, MomentumRiskOverlayBacktestComponent, RiskAdjustedMomentumAnalysisComponent, RiskAdjustedMomentumBacktestComponent, TechnicalIndicatorComponent, MarketBreadthComponent, BreadthBacktestComponent], templateUrl: './app.html', styleUrl: './app.scss' })
+@Component({ selector: 'app-root', imports: [UserManagementComponent, LoginComponent, FormsModule, DatePipe, StockMasterComponent, ETFMasterComponent, IndexMasterComponent, NiftyIndexStockComponent, MomentumAnalysisComponent, MomentumDashboardComponent, MomentumBacktestComponent, MomentumRiskOverlayBacktestComponent, RiskAdjustedMomentumAnalysisComponent, RiskAdjustedMomentumBacktestComponent, TechnicalIndicatorComponent, MarketBreadthComponent, BreadthBacktestComponent], templateUrl: './app.html', styleUrl: './app.scss' })
 export class App {
   private readonly http = inject(HttpClient);
+  readonly auth = inject(AuthService);
   readonly mobileNavigationOpen = signal(false);
   readonly timeFrame = signal<TimeFrame>('DAILY');
   readonly loading = signal<Record<SourceKey, boolean>>({ stock: false, etf: false, index: false });
+  readonly progress = signal<Partial<Record<SourceKey, PriceUpdateJob>>>({});
   readonly history = signal<HistoryItem[]>([]);
   readonly notice = signal<{ type: 'success' | 'error'; message: string } | null>(null);
-  readonly activePage = signal<'dashboard' | 'price' | 'stocks' | 'etfs' | 'indexes' | 'nifty-index-stock' | 'momentum' | 'momentum-backtest' | 'momentum-risk-overlay' | 'risk-adjusted-momentum' | 'risk-adjusted-momentum-backtest' | 'market-breadth' | 'breadth-backtest' | 'technical-indicator'>('dashboard');
+  private readonly selectedPage = signal<Page>('dashboard');
+  readonly activePage = computed<Page>(() => {
+    const page = this.selectedPage();
+    if (page === 'dashboard' || page === 'login') return page;
+    if (!this.auth.isAuthenticated()) return 'login';
+    if (ADMIN_PAGES.includes(page) && !this.auth.isAdmin()) return 'dashboard';
+    return page;
+  });
+  navigate(page: Page): void {
+    this.selectedPage.set(page);
+    this.mobileNavigationOpen.set(false);
+  }
+  logout(): void {
+    this.auth.logout();
+    this.navigate('dashboard');
+  }
+
   readonly theme = signal<AppTheme>(this.savedTheme());
   readonly isAnyLoading = computed(() => Object.values(this.loading()).some(Boolean));
   readonly sources: PriceSource[] = [
@@ -39,11 +62,13 @@ export class App {
     { key: 'index', title: 'Index Prices', shortTitle: 'indices', description: 'Refresh historical price data for configured market indices.', path: 'index-Price', icon: '⌁' }
   ];
   sync(source: PriceSource, selectedTimeFrame = this.timeFrame()): void {
-    if (this.loading()[source.key]) return;
+    if (!this.auth.isAdmin() || this.loading()[source.key]) return;
     this.loading.update(value => ({ ...value, [source.key]: true })); this.notice.set(null);
+    this.progress.update(value => ({ ...value, [source.key]: undefined }));
     this.http.post<PriceUpdateJob>(`/api/price-data/jobs/${source.path}/${selectedTimeFrame}`, null).pipe(
       switchMap(job => timer(0, 2000).pipe(
         exhaustMap(() => this.http.get<PriceUpdateJob>(`/api/price-data/jobs/${job.id}`).pipe(retry({ count: 3, delay: 2000 }))),
+        tap(status => this.progress.update(value => ({ ...value, [source.key]: status }))),
         filter(status => status.status === 'SUCCEEDED' || status.status === 'FAILED'),
         take(1)
       )),

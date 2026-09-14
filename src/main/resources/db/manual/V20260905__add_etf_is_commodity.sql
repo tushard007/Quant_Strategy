@@ -1,0 +1,2 @@
+ALTER TABLE nse_etf_master_data
+    ADD COLUMN IF NOT EXISTS is_commodity BOOLEAN NOT NULL DEFAULT FALSE;
