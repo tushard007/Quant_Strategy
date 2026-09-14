@@ -10,3 +10,75 @@
   }
   .sidebar nav.mobile-open { display: block; flex-basis: 100%; width: 100%; }
 }
+
+/* --- Accessibility: visible skip link + consistent keyboard focus --- */
+.skip-link {
+  position: absolute; left: 12px; top: -60px; z-index: 20;
+  padding: 10px 16px; border-radius: 8px; background: #102c25; color: #fff;
+  font: 700 13px/1 system-ui; text-decoration: none; transition: top .15s ease;
+}
+.skip-link:focus { top: 12px; }
+main:focus-visible { outline: none; }
+button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible {
+  outline: 2px solid var(--theme-accent, #177956); outline-offset: 2px;
+}
+
+/* --- Sidebar nav polish --- */
+.menu-title { margin: 22px 0 8px; }
+.menu-title:first-of-type { margin-top: 6px; }
+.submenu { display: flex; flex-direction: column; gap: 3px; }
+.nav-item {
+  position: relative; border: 1px solid transparent; cursor: pointer; width: 100%; text-align: left;
+  transition: background-color .12s ease, transform .12s ease;
+}
+.nav-item:hover { background: #ffffff1e; }
+.nav-item.active { background: #ffffff20; border-color: #ffffff2a; }
+.nav-item.active::before {
+  content: ''; position: absolute; left: -18px; top: 8px; bottom: 8px; width: 3px;
+  border-radius: 3px; background: #65d4a9;
+}
+.nav-item small { color: #a9c0b9; }
+
+/* --- Collapsible drawer for menu sections with more than 2 items --- */
+.menu-title.toggle {
+  width: 100%; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.menu-title.toggle:hover span { color: #d7ece5; }
+.menu-title.toggle i {
+  font-style: normal; transition: transform .18s ease;
+}
+.menu-title.toggle[aria-expanded="false"] i { transform: rotate(-90deg); }
+.submenu-drawer {
+  overflow: hidden; max-height: 640px; transition: max-height .2s ease, opacity .15s ease; opacity: 1;
+}
+.submenu-drawer.collapsed { max-height: 0; opacity: 0; }
+
+/* --- Topbar with account controls (persistent, all breakpoints) --- */
+.topbar {
+  position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; margin: -42px calc(-1 * clamp(28px, 5vw, 72px)) 28px; padding: 16px clamp(28px, 5vw, 72px);
+  background: #fff; border-bottom: 1px solid #dce4e1; backdrop-filter: blur(6px);
+}
+.topbar-page { font: 700 13px/1 system-ui; color: #52645e; letter-spacing: .02em; }
+.account-control { display: flex; align-items: center; gap: 10px; }
+.account-control .avatar {
+  display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%;
+  background: #177956; color: #fff; font: 700 12px/1 system-ui;
+}
+.account-identity { display: flex; flex-direction: column; gap: 1px; line-height: 1.15; }
+.account-identity strong { font-size: 13px; color: #122a23; }
+.account-identity small { font-size: 11px; color: #6b7974; }
+.account-button {
+  height: 36px; padding: 0 16px; border-radius: 7px; font-weight: 700; font-size: 13px; cursor: pointer;
+}
+.account-button.primary { border: 0; background: #177956; color: #fff; }
+.account-button.primary:hover { filter: brightness(.95); }
+.account-button.outline { border: 1px solid #cbd7d2; background: #fff; color: #35463f; }
+.account-button.outline:hover { background: #f5f7f5; }
+@media (max-width: 700px) {
+  .brand small { display: none; }
+  .sidebar { min-height: 64px; padding: 14px 16px; }
+  .mobile-menu-toggle { padding: 9px 12px; }
+  .topbar { margin: -26px -16px 20px; padding: 14px 16px; min-height: 64px; box-sizing: border-box; }
+  .account-identity { display: none; }
+}

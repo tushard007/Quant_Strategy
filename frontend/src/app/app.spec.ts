@@ -27,7 +27,7 @@ describe('App access', () => {
     fixture.detectChanges();
     const element = fixture.nativeElement as HTMLElement;
     expect(element.querySelector('h1')?.textContent).toContain('Momentum dashboard');
-    expect(element.querySelector('nav')?.textContent).toContain('Sign in');
+    expect(element.querySelector('.account-control')?.textContent).toContain('Sign in');
     expect(element.querySelector('nav')?.textContent).not.toContain('MASTER');
     expect(element.querySelector('nav')?.textContent).not.toContain('ANALYSIS');
   });
@@ -70,7 +70,7 @@ describe('App access', () => {
     expect(navigation.textContent).toContain('MASTER');
     expect(navigation.textContent).toContain('ANALYSIS');
     expect(navigation.textContent).toContain('ADMINISTRATION');
-    expect(navigation.textContent).toContain('Superadmin');
+    expect((fixture.nativeElement as HTMLElement).querySelector('.account-control')?.textContent).toContain('Superadmin');
     fixture.componentInstance.navigate('users');
     expect(fixture.componentInstance.activePage()).toBe('users');
   });

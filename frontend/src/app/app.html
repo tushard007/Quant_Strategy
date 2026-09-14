@@ -1,4 +1,5 @@
 <div class="app-shell" [attr.data-theme]="theme()">
+  <a class="skip-link" href="#main-content">Skip to main content</a>
   <aside class="sidebar">
     <div class="brand"><span class="brand-mark">Q</span><div><strong>Quant Strategy</strong><small>Operations Console</small></div></div>
     <button class="mobile-menu-toggle" type="button" aria-controls="main-navigation"
@@ -9,40 +10,50 @@
     <nav id="main-navigation" aria-label="Main navigation" [class.mobile-open]="mobileNavigationOpen()">
       <div class="menu-title"><span>OVERVIEW</span></div>
       <div class="submenu">
-        <button class="nav-item" [class.active]="activePage() === 'dashboard'" type="button" (click)="navigate('dashboard')"><span>◫</span><div><strong>Momentum Dashboard</strong><small>Strategy overview</small></div></button>
+        <button class="nav-item" [class.active]="activePage() === 'dashboard'" [attr.aria-current]="activePage() === 'dashboard' ? 'page' : null" type="button" (click)="navigate('dashboard')"><span aria-hidden="true">◫</span><div><strong>Momentum Dashboard</strong><small>Strategy overview</small></div></button>
       </div>
       @if (auth.isAdmin()) {
-      <div class="menu-title"><span>MASTER</span><i>⌄</i></div>
+      <button class="menu-title toggle" type="button" aria-controls="master-submenu" [attr.aria-expanded]="expandedSections().master" (click)="toggleSection('master')"><span>MASTER</span><i aria-hidden="true">⌄</i></button>
+      <div class="submenu-drawer" id="master-submenu" [class.collapsed]="!expandedSections().master">
       <div class="submenu">
-        <button class="nav-item" [class.active]="activePage() === 'price'" type="button" (click)="navigate('price')"><span>⌁</span><div><strong>Price Data Master</strong><small>Update market prices</small></div></button>
-        <button class="nav-item" [class.active]="activePage() === 'stocks'" type="button" (click)="navigate('stocks')"><span>▥</span><div><strong>Stock Master</strong><small>Manage stock records</small></div></button>
-        <button class="nav-item" [class.active]="activePage() === 'etfs'" type="button" (click)="navigate('etfs')"><span>◇</span><div><strong>ETF Master</strong><small>Manage ETF records</small></div></button>
-        <button class="nav-item" [class.active]="activePage() === 'indexes'" type="button" (click)="navigate('indexes')"><span>◎</span><div><strong>Index Master</strong><small>Manage index records</small></div></button>
-        <button class="nav-item" [class.active]="activePage() === 'nifty-index-stock'" type="button" (click)="navigate('nifty-index-stock')"><span>▤</span><div><strong>Nifty Index Stocks</strong><small>Manage index constituent lists</small></div></button>
+        <button class="nav-item" [class.active]="activePage() === 'price'" [attr.aria-current]="activePage() === 'price' ? 'page' : null" type="button" (click)="navigate('price')"><span aria-hidden="true">⌁</span><div><strong>Price Data Master</strong><small>Update market prices</small></div></button>
+        <button class="nav-item" [class.active]="activePage() === 'stocks'" [attr.aria-current]="activePage() === 'stocks' ? 'page' : null" type="button" (click)="navigate('stocks')"><span aria-hidden="true">▥</span><div><strong>Stock Master</strong><small>Manage stock records</small></div></button>
+        <button class="nav-item" [class.active]="activePage() === 'etfs'" [attr.aria-current]="activePage() === 'etfs' ? 'page' : null" type="button" (click)="navigate('etfs')"><span aria-hidden="true">◇</span><div><strong>ETF Master</strong><small>Manage ETF records</small></div></button>
+        <button class="nav-item" [class.active]="activePage() === 'indexes'" [attr.aria-current]="activePage() === 'indexes' ? 'page' : null" type="button" (click)="navigate('indexes')"><span aria-hidden="true">◎</span><div><strong>Index Master</strong><small>Manage index records</small></div></button>
+        <button class="nav-item" [class.active]="activePage() === 'nifty-index-stock'" [attr.aria-current]="activePage() === 'nifty-index-stock' ? 'page' : null" type="button" (click)="navigate('nifty-index-stock')"><span aria-hidden="true">▤</span><div><strong>Nifty Index Stocks</strong><small>Manage index constituent lists</small></div></button>
+      </div>
       </div>
       }
       @if (auth.isAuthenticated()) {
-      <div class="menu-title"><span>ANALYSIS</span><i>⌄</i></div>
-      <div class="submenu"><button class="nav-item" [class.active]="activePage() === 'momentum'" type="button" (click)="navigate('momentum')"><span>↗</span><div><strong>Momentum Analysis</strong><small>Calculate and rank assets</small></div></button><button class="nav-item" [class.active]="activePage() === 'momentum-backtest'" type="button" (click)="navigate('momentum-backtest')"><span>◫</span><div><strong>Momentum Backtest</strong><small>Top-10 / top-20 strategy</small></div></button><button class="nav-item" [class.active]="activePage() === 'momentum-risk-overlay'" type="button" (click)="navigate('momentum-risk-overlay')"><span>⛨</span><div><strong>Risk Overlay Backtest</strong><small>Stops, breadth and regime</small></div></button><button class="nav-item" [class.active]="activePage() === 'risk-adjusted-momentum'" type="button" (click)="navigate('risk-adjusted-momentum')"><span>◈</span><div><strong>Risk-Adjusted Momentum</strong><small>12-1 momentum with volatility</small></div></button><button class="nav-item" [class.active]="activePage() === 'risk-adjusted-momentum-backtest'" type="button" (click)="navigate('risk-adjusted-momentum-backtest')"><span>⚖</span><div><strong>Risk-Adjusted Momentum Backtest</strong><small>Inverse-vol sizing with stops</small></div></button><button class="nav-item" [class.active]="activePage() === 'market-breadth'" type="button" (click)="navigate('market-breadth')"><span>⌗</span><div><strong>Market Breadth</strong><small>Regime score and breadth indicators</small></div></button><button class="nav-item" [class.active]="activePage() === 'breadth-backtest'" type="button" (click)="navigate('breadth-backtest')"><span>⧉</span><div><strong>Breadth Backtest</strong><small>Verify breadth-filtered momentum results</small></div></button><button class="nav-item" [class.active]="activePage() === 'technical-indicator'" type="button" (click)="navigate('technical-indicator')"><span>⌁</span><div><strong>Technical Indicator</strong><small>EMA and SuperTrend signals</small></div></button></div>
+      <button class="menu-title toggle" type="button" aria-controls="analysis-submenu" [attr.aria-expanded]="expandedSections().analysis" (click)="toggleSection('analysis')"><span>ANALYSIS</span><i aria-hidden="true">⌄</i></button>
+      <div class="submenu-drawer" id="analysis-submenu" [class.collapsed]="!expandedSections().analysis">
+      <div class="submenu"><button class="nav-item" [class.active]="activePage() === 'momentum'" [attr.aria-current]="activePage() === 'momentum' ? 'page' : null" type="button" (click)="navigate('momentum')"><span aria-hidden="true">↗</span><div><strong>Momentum Analysis</strong><small>Calculate and rank assets</small></div></button><button class="nav-item" [class.active]="activePage() === 'momentum-backtest'" [attr.aria-current]="activePage() === 'momentum-backtest' ? 'page' : null" type="button" (click)="navigate('momentum-backtest')"><span aria-hidden="true">◫</span><div><strong>Momentum Backtest</strong><small>Top-10 / top-20 strategy</small></div></button><button class="nav-item" [class.active]="activePage() === 'momentum-risk-overlay'" [attr.aria-current]="activePage() === 'momentum-risk-overlay' ? 'page' : null" type="button" (click)="navigate('momentum-risk-overlay')"><span aria-hidden="true">⛨</span><div><strong>Risk Overlay Backtest</strong><small>Stops, breadth and regime</small></div></button><button class="nav-item" [class.active]="activePage() === 'risk-adjusted-momentum'" [attr.aria-current]="activePage() === 'risk-adjusted-momentum' ? 'page' : null" type="button" (click)="navigate('risk-adjusted-momentum')"><span aria-hidden="true">◈</span><div><strong>Risk-Adjusted Momentum</strong><small>12-1 momentum with volatility</small></div></button><button class="nav-item" [class.active]="activePage() === 'risk-adjusted-momentum-backtest'" [attr.aria-current]="activePage() === 'risk-adjusted-momentum-backtest' ? 'page' : null" type="button" (click)="navigate('risk-adjusted-momentum-backtest')"><span aria-hidden="true">⚖</span><div><strong>Risk-Adjusted Momentum Backtest</strong><small>Inverse-vol sizing with stops</small></div></button><button class="nav-item" [class.active]="activePage() === 'market-breadth'" [attr.aria-current]="activePage() === 'market-breadth' ? 'page' : null" type="button" (click)="navigate('market-breadth')"><span aria-hidden="true">⌗</span><div><strong>Market Breadth</strong><small>Regime score and breadth indicators</small></div></button><button class="nav-item" [class.active]="activePage() === 'breadth-backtest'" [attr.aria-current]="activePage() === 'breadth-backtest' ? 'page' : null" type="button" (click)="navigate('breadth-backtest')"><span aria-hidden="true">⧉</span><div><strong>Breadth Backtest</strong><small>Verify breadth-filtered momentum results</small></div></button><button class="nav-item" [class.active]="activePage() === 'technical-indicator'" [attr.aria-current]="activePage() === 'technical-indicator' ? 'page' : null" type="button" (click)="navigate('technical-indicator')"><span aria-hidden="true">⌁</span><div><strong>Technical Indicator</strong><small>EMA and SuperTrend signals</small></div></button></div>
+      </div>
       }
-      @if (auth.isAdmin()) {
+      @if (auth.isSuperadmin()) {
         <div class="menu-title"><span>ADMINISTRATION</span></div>
-        <button class="nav-item" [class.active]="activePage() === 'users'" type="button" (click)="navigate('users')"><span>♙</span><div><strong>Users</strong><small>Accounts and roles</small></div></button>
-      }
-      @if (auth.user(); as user) {
-        <div class="menu-title"><span>{{ user.username }} · {{ auth.roleLabel() }}</span></div>
-        <button class="nav-item" type="button" (click)="logout()"><span>↪</span><strong>Sign out</strong></button>
-      } @else {
-        <button class="nav-item" type="button" (click)="navigate('login')"><span>↪</span><div><strong>Sign in</strong><small>Access analysis tools</small></div></button>
+        <button class="nav-item" [class.active]="activePage() === 'users'" [attr.aria-current]="activePage() === 'users' ? 'page' : null" type="button" (click)="navigate('users')"><span aria-hidden="true">♙</span><div><strong>Users</strong><small>Accounts and roles</small></div></button>
       }
     </nav>
     <div class="sidebar-footer"><label class="theme-control" for="appTheme"><span>Colour theme</span><select id="appTheme" [ngModel]="theme()" (ngModelChange)="setTheme($event)"><option value="forest">Forest</option><option value="ocean">Ocean</option><option value="slate">Slate</option><option value="contrast">High contrast</option></select></label><div class="api-status"><span class="status-dot"></span><div><strong>API endpoint</strong><small>localhost:8080</small></div></div></div>
   </aside>
-  <main>
+  <main id="main-content" tabindex="-1">
+    <div class="topbar">
+      <span class="topbar-page">{{ pageLabel() }}</span>
+      <div class="account-control">
+        @if (auth.user(); as user) {
+          <span class="avatar" aria-hidden="true">{{ userInitials() }}</span>
+          <span class="account-identity"><strong>{{ user.username }}</strong><small>{{ auth.roleLabel() }}</small></span>
+          <button class="account-button outline" type="button" (click)="logout()">Sign out</button>
+        } @else {
+          <button class="account-button primary" type="button" (click)="navigate('login')">Sign in</button>
+        }
+      </div>
+    </div>
     @if (auth.message()) {
       <div class="notice" role="status"><p>{{ auth.message() }}</p><button type="button" aria-label="Dismiss" (click)="auth.message.set(null)">×</button></div>
     }
-    @if (activePage() === 'login') {<app-login (signedIn)="navigate('dashboard')" (cancelled)="navigate('dashboard')" />}
+    @if (activePage() === 'login') {<app-login (signedIn)="navigate('market-breadth')" (cancelled)="navigate('dashboard')" />}
     @else if (activePage() === 'users') {<app-user-management />}
     @else if (activePage() === 'dashboard') {<app-momentum-dashboard (openAnalysis)="navigate('momentum')" />} @else if (activePage() === 'price') {
     <header><div><p class="eyebrow">MARKET DATA</p><h1>Price Data Master</h1><p class="subtitle">Fetch and update historical price data for every instrument class.</p></div><a class="swagger" href="http://localhost:8080/swagger-ui/index.html#/price-data-controller" target="_blank" rel="noreferrer">API documentation ↗</a></header>
@@ -59,5 +70,8 @@
       <div class="section-heading"><div><h2>Request history</h2><p>Updates run during this browser session.</p></div>@if (history().length) {<button class="text-button" type="button" (click)="clearHistory()">Clear history</button>}</div>
       @if (history().length) {<div class="table-wrap"><table><thead><tr><th>Data type</th><th>Frequency</th><th>Status</th><th>Completed</th><th>Details</th><th></th></tr></thead><tbody>@for (item of history(); track item.id) {<tr><td><strong>{{ item.title }}</strong></td><td>{{ item.timeFrame === 'DAILY' ? 'Daily' : 'Weekly' }}</td><td><span class="result" [class.failed]="!item.success">{{ item.success ? 'Completed' : 'Needs attention' }}</span></td><td>{{ item.completedAt | date:'mediumTime' }}</td><td class="response" [title]="item.message">{{ item.message }}</td><td><button class="retry" type="button" (click)="retry(item)" aria-label="Retry update">↻</button></td></tr>}</tbody></table></div>} @else {<div class="empty"><span>↻</span><h3>No updates yet</h3><p>Choose a data type above to start your first price update.</p></div>}
     </section>
-  } @else if (activePage() === 'stocks') {<app-stock-master />} @else if (activePage() === 'etfs') {<app-etf-master />} @else if (activePage() === 'indexes') {<app-index-master />} @else if (activePage() === 'nifty-index-stock') {<app-nifty-index-stock />} @else if (activePage() === 'momentum') {<app-momentum-analysis />} @else if (activePage() === 'momentum-backtest') {<app-momentum-backtest />} @else if (activePage() === 'momentum-risk-overlay') {<app-momentum-risk-overlay-backtest />} @else if (activePage() === 'risk-adjusted-momentum') {<app-risk-adjusted-momentum-analysis />} @else if (activePage() === 'risk-adjusted-momentum-backtest') {<app-risk-adjusted-momentum-backtest />} @else if (activePage() === 'market-breadth') {<app-market-breadth />} @else if (activePage() === 'breadth-backtest') {<app-breadth-backtest />} @else {<app-technical-indicator />} </main>
+  } @else if (activePage() === 'stocks') {<app-stock-master />} @else if (activePage() === 'etfs') {<app-etf-master />} @else if (activePage() === 'indexes') {<app-index-master />} @else if (activePage() === 'nifty-index-stock') {<app-nifty-index-stock />} @else if (activePage() === 'momentum') {<app-momentum-analysis />} @else if (activePage() === 'momentum-backtest') {<app-momentum-backtest />} @else if (activePage() === 'momentum-risk-overlay') {<app-momentum-risk-overlay-backtest />} @else if (activePage() === 'risk-adjusted-momentum') {<app-risk-adjusted-momentum-analysis />} @else if (activePage() === 'risk-adjusted-momentum-backtest') {<app-risk-adjusted-momentum-backtest />} @else if (activePage() === 'market-breadth') {
+    @if (auth.user(); as user) {<div class="notice" role="status"><p>Welcome, {{ user.username }}!</p></div>}
+    <app-market-breadth />
+  } @else if (activePage() === 'breadth-backtest') {<app-breadth-backtest />} @else {<app-technical-indicator />} </main>
 </div>

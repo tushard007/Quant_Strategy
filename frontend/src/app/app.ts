@@ -20,7 +20,17 @@ import { RiskAdjustedMomentumBacktestComponent } from './risk-adjusted-momentum-
 import { MarketBreadthComponent } from './market-breadth/market-breadth.component';
 import { BreadthBacktestComponent } from './breadth-backtest/breadth-backtest.component';
 type Page = 'users' | 'dashboard' | 'login' | 'price' | 'stocks' | 'etfs' | 'indexes' | 'nifty-index-stock' | 'momentum' | 'momentum-backtest' | 'momentum-risk-overlay' | 'risk-adjusted-momentum' | 'risk-adjusted-momentum-backtest' | 'market-breadth' | 'breadth-backtest' | 'technical-indicator';
-const ADMIN_PAGES: readonly Page[] = ['users', 'price', 'stocks', 'etfs', 'indexes', 'nifty-index-stock'];
+const ADMIN_PAGES: readonly Page[] = ['price', 'stocks', 'etfs', 'indexes', 'nifty-index-stock'];
+const SUPERADMIN_PAGES: readonly Page[] = ['users'];
+const LOGGED_IN_HOME: Page = 'market-breadth';
+const PAGE_LABELS: Record<Page, string> = {
+  dashboard: 'Momentum Dashboard', login: 'Sign in', price: 'Price Data Master', stocks: 'Stock Master',
+  etfs: 'ETF Master', indexes: 'Index Master', 'nifty-index-stock': 'Nifty Index Stocks',
+  momentum: 'Momentum Analysis', 'momentum-backtest': 'Momentum Backtest', 'momentum-risk-overlay': 'Risk Overlay Backtest',
+  'risk-adjusted-momentum': 'Risk-Adjusted Momentum', 'risk-adjusted-momentum-backtest': 'Risk-Adjusted Momentum Backtest',
+  'market-breadth': 'Market Breadth', 'breadth-backtest': 'Breadth Backtest', 'technical-indicator': 'Technical Indicator',
+  users: 'Users'
+};
 type TimeFrame = 'DAILY' | 'WEEKLY';
 type SourceKey = 'stock' | 'etf' | 'index';
 type AppTheme = 'forest' | 'ocean' | 'slate' | 'contrast';
@@ -42,9 +52,16 @@ export class App {
     const page = this.selectedPage();
     if (page === 'dashboard' || page === 'login') return page;
     if (!this.auth.isAuthenticated()) return 'login';
-    if (ADMIN_PAGES.includes(page) && !this.auth.isAdmin()) return 'dashboard';
+    if (SUPERADMIN_PAGES.includes(page) && !this.auth.isSuperadmin()) return LOGGED_IN_HOME;
+    if (ADMIN_PAGES.includes(page) && !this.auth.isAdmin()) return LOGGED_IN_HOME;
     return page;
   });
+  readonly pageLabel = computed(() => PAGE_LABELS[this.activePage()]);
+  readonly userInitials = computed(() => this.auth.user()?.username.slice(0, 2).toUpperCase() ?? '');
+  readonly expandedSections = signal<Record<'master' | 'analysis', boolean>>({ master: true, analysis: true });
+  toggleSection(key: 'master' | 'analysis'): void {
+    this.expandedSections.update(value => ({ ...value, [key]: !value[key] }));
+  }
   navigate(page: Page): void {
     this.selectedPage.set(page);
     this.mobileNavigationOpen.set(false);
