@@ -1,0 +1,95 @@
+<header class="page-header">
+  <div>
+    <p class="eyebrow">ADMINISTRATION</p>
+    <h1>System Metrics</h1>
+    <p class="subtitle">
+      Live JVM and application health metrics from Spring Boot Actuator. Memory is shown in
+      megabytes.
+    </p>
+  </div>
+  <div class="header-actions">
+    @if (updatedAt(); as timestamp) {
+      <small class="timestamp">Updated {{ timestamp | date: 'mediumTime' }}</small>
+    }
+    <button class="primary" type="button" (click)="refresh()" [disabled]="loading()">
+      {{ loading() ? 'Refreshing…' : 'Refresh now' }}
+    </button>
+  </div>
+</header>
+
+@if (error()) {
+  <div class="notice error" role="alert">
+    <p>{{ error() }}</p>
+  </div>
+}
+
+@if (health(); as value) {
+  <section
+    class="control-panel health"
+    [class.degraded]="!healthy()"
+    aria-label="Application health"
+  >
+    <div class="health-status">
+      <span class="status-dot" aria-hidden="true"></span>
+      <div>
+        <strong>Application health</strong>
+        <p>
+          Actuator status: <b>{{ value.status }}</b>
+        </p>
+      </div>
+    </div>
+    @if (memoryUsage(); as usage) {
+      <div class="memory-meter">
+        <div class="memory-heading">
+          <span>Heap and non-heap memory</span>
+          <b>{{ megabytes(usage.used) }} / {{ megabytes(usage.max) }}</b>
+        </div>
+        <div
+          class="meter"
+          role="img"
+          [attr.aria-label]="
+            'Memory used ' + usage.percent.toFixed(1) + ' percent of the available limit'
+          "
+        >
+          <i [style.width.%]="usage.percent"></i>
+        </div>
+        <small>{{ usage.percent.toFixed(1) }}% used · {{ megabytes(usage.free) }} free</small>
+      </div>
+    }
+  </section>
+}
+
+@if (cards().length) {
+  <section class="cards" aria-label="Runtime metrics">
+    @for (card of cards(); track card.name) {
+      <article class="data-card" [attr.data-tone]="card.tone">
+        <div class="card-top">
+          <span class="icon" aria-hidden="true">{{ card.icon }}</span>
+          <span class="unit">{{ card.category }}</span>
+        </div>
+        <h2>{{ card.label }}</h2>
+        <p class="metric-value">
+          <strong>{{ card.value }}</strong
+          ><span>{{ card.unit }}</span>
+        </p>
+        @if (card.percent !== null) {
+          <div
+            class="meter small"
+            role="img"
+            [attr.aria-label]="card.label + ' at ' + card.percent.toFixed(1) + ' percent'"
+          >
+            <i [style.width.%]="card.percent"></i>
+          </div>
+        }
+        @if (card.detail) {
+          <small class="detail">{{ card.detail }}</small>
+        }
+        <small class="description">{{ card.description }}</small>
+      </article>
+    }
+  </section>
+} @else if (!error()) {
+  <section class="empty-state">
+    <p>{{ loading() ? 'Loading metrics…' : 'No metrics are currently exposed by Actuator.' }}</p>
+  </section>
+}

@@ -1,0 +1,18 @@
+flowchart TD
+    A[Run Analysis on rebalance date<br/>Entry 20 / Retention 40 / Benchmark NIFTY 500<br/>Stop: ATR 14x3 / SMA 200 / Breadth 20% / Cap 50%] --> B{Benchmark above<br/>200-day SMA?}
+    B -- No --> C[No new buys this month<br/>Effective entry rank = 0<br/>Just hold existing / stay in cash]
+    B -- Yes --> D{Universe breadth<br/>>= 20%?}
+    D -- No --> E[Exposure cap applies<br/>Effective entry rank = 10<br/>Take only top 10 ranked names]
+    D -- Yes --> F[Full exposure<br/>Take top 20 ranked names]
+    E --> G[For each new entry:<br/>note Stop Level column value<br/>place/track stop order]
+    F --> G
+    C --> H[Retention check]
+    G --> H[Retention check]
+    H --> I{Held stock still<br/>inside rank 40?}
+    I -- Yes --> J[Keep holding]
+    I -- No --> K[Sell]
+    J --> L{Price closed at/below<br/>its stop level?}
+    L -- Yes --> K
+    L -- No --> M[Continue holding until next month]
+    K --> N[Repeat next month]
+    M --> N
