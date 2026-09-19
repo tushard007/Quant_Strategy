@@ -47,7 +47,7 @@
       <div class="notice" role="status"><p>{{ auth.message() }}</p><button type="button" aria-label="Dismiss" (click)="auth.message.set(null)">×</button></div>
     }
     @if (activePage() === 'login') {<app-login (signedIn)="signedIn()" (cancelled)="navigate('dashboard')" />}
-    @else if (activePage() === 'users') {<app-user-management />}
+    @else if (activePage() === 'users') {<app-user-management />} @else if (activePage() === 'system-metrics') {<app-system-metrics />}
     @else if (activePage() === 'dashboard') {<app-momentum-dashboard (openAnalysis)="navigate('momentum')" />} @else if (activePage() === 'price') {
     <header><div><p class="eyebrow">MARKET DATA</p><h1>Price Data Master</h1><p class="subtitle">Fetch and update historical price data for every instrument class.</p></div><a class="swagger" href="http://localhost:8080/swagger-ui/index.html#/price-data-controller" target="_blank" rel="noreferrer">API documentation ↗</a></header>
     @if (notice()) {<div class="notice" [class.error]="notice()?.type === 'error'"><span>{{ notice()?.type === 'success' ? '✓' : '!' }}</span><p>{{ notice()?.message }}</p><button type="button" aria-label="Dismiss notification" (click)="notice.set(null)">×</button></div>}

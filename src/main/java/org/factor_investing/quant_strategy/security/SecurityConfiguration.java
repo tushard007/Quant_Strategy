@@ -70,6 +70,8 @@ public class SecurityConfiguration {
                 .authorizeHttpRequests(access -> access
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
+                        .requestMatchers("/actuator/**").hasRole("SUPERADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/momentum/executions",
                                 "/api/momentum/executions/{assetDataType}/{strategyRunDate}").permitAll()
                         .requestMatchers("/api/auth/me").hasAnyRole("SUPERADMIN", "ADMIN", "USER")

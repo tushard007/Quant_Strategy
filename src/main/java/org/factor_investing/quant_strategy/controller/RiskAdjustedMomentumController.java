@@ -1,6 +1,8 @@
 package org.factor_investing.quant_strategy.controller;
 
 import org.factor_investing.quant_strategy.model.AssetDataType;
+import org.factor_investing.quant_strategy.model.NiftyIndexName;
+import org.factor_investing.quant_strategy.service.NiftyIndexStockService;
 import org.factor_investing.quant_strategy.strategies.risk_adjusted_momentum.RiskAdjustedMomentumResult;
 import org.factor_investing.quant_strategy.strategies.risk_adjusted_momentum.RiskAdjustedMomentumService;
 import org.factor_investing.quant_strategy.model.response.RiskAdjustedMomentumExecutionSummary;
@@ -23,9 +25,12 @@ import java.util.List;
 public class RiskAdjustedMomentumController {
 
     private final RiskAdjustedMomentumService riskAdjustedMomentumService;
+    private final NiftyIndexStockService niftyIndexStockService;
 
-    public RiskAdjustedMomentumController(RiskAdjustedMomentumService riskAdjustedMomentumService) {
+    public RiskAdjustedMomentumController(RiskAdjustedMomentumService riskAdjustedMomentumService,
+                                          NiftyIndexStockService niftyIndexStockService) {
         this.riskAdjustedMomentumService = riskAdjustedMomentumService;
+        this.niftyIndexStockService = niftyIndexStockService;
     }
 
     @PostMapping("/calculate-and-rank/{assetDataType}")
@@ -43,12 +48,17 @@ public class RiskAdjustedMomentumController {
             @RequestParam(required = false) Double atrMultiplier,
             @RequestParam(required = false) Integer benchmarkSmaPeriod,
             @RequestParam(required = false) Double breadthThresholdPercent,
-            @RequestParam(required = false) Double weakExposureCapPercent
+            @RequestParam(required = false) Double weakExposureCapPercent,
+            @RequestParam(required = false) NiftyIndexName niftyIndex
     ) {
+        List<String> stockSymbols = assetDataType == AssetDataType.STOCK && niftyIndex != null
+                ? niftyIndexStockService.symbolsForIndex(niftyIndex)
+                : null;
         RiskAdjustedMomentumResult result = riskAdjustedMomentumService.calculateAndRankMomentum(
                 assetDataType, asOfDate, entryRank, retentionRank, allocationMode,
                 benchmark, stopModel, trailingStopPercent, atrPeriod, atrMultiplier,
-                benchmarkSmaPeriod, breadthThresholdPercent, weakExposureCapPercent);
+                benchmarkSmaPeriod, breadthThresholdPercent, weakExposureCapPercent,
+                stockSymbols, niftyIndex);
         return result.isValid()
                 ? ResponseEntity.ok(result)
                 : ResponseEntity.badRequest().body(result);

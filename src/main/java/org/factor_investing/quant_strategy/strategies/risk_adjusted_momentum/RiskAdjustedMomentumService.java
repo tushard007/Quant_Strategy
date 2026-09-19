@@ -2,6 +2,7 @@ package org.factor_investing.quant_strategy.strategies.risk_adjusted_momentum;
 
 import lombok.extern.slf4j.Slf4j;
 import org.factor_investing.quant_strategy.model.AssetDataType;
+import org.factor_investing.quant_strategy.model.NiftyIndexName;
 import org.factor_investing.quant_strategy.model.NSE_ETFMasterData;
 import org.factor_investing.quant_strategy.model.TopN_RiskAdjustedMomentumAssetType;
 import org.factor_investing.quant_strategy.model.response.RiskAdjustedMomentumExecutionSummary;
@@ -114,6 +115,18 @@ public class RiskAdjustedMomentumService {
                                                                  String benchmark, String stopModel, Double trailingStopPercent,
                                                                  Integer atrPeriod, Double atrMultiplier, Integer benchmarkSmaPeriod,
                                                                  Double breadthThresholdPercent, Double weakExposureCapPercent) {
+        return calculateAndRankMomentum(assetDataType, asOfDate, entryRank, retentionRank, allocationMode,
+                benchmark, stopModel, trailingStopPercent, atrPeriod, atrMultiplier, benchmarkSmaPeriod,
+                breadthThresholdPercent, weakExposureCapPercent, null, null);
+    }
+
+    @Transactional
+    public RiskAdjustedMomentumResult calculateAndRankMomentum(AssetDataType assetDataType, LocalDate asOfDate,
+                                                                  Integer entryRank, Integer retentionRank, String allocationMode,
+                                                                  String benchmark, String stopModel, Double trailingStopPercent,
+                                                                  Integer atrPeriod, Double atrMultiplier, Integer benchmarkSmaPeriod,
+                                                                  Double breadthThresholdPercent, Double weakExposureCapPercent,
+                                                                  Collection<String> stockSymbols, NiftyIndexName niftyIndex) {
         LocalDate calculationDate = asOfDate == null ? LocalDate.now(MARKET_TIME_ZONE) : asOfDate;
         int effectiveEntryRank = entryRank != null ? entryRank : RiskAdjustedMomentumConstants.ENTRY_RANK;
         int effectiveRetentionRank = retentionRank != null ? retentionRank : RiskAdjustedMomentumConstants.RETENTION_RANK;
@@ -133,13 +146,13 @@ public class RiskAdjustedMomentumService {
         double effectiveBreadthThresholdPercent = breadthThresholdPercent != null ? breadthThresholdPercent : RiskAdjustedMomentumConstants.DEFAULT_BREADTH_THRESHOLD_PERCENT;
         double effectiveWeakExposureCapPercent = weakExposureCapPercent != null ? weakExposureCapPercent : RiskAdjustedMomentumConstants.DEFAULT_WEAK_EXPOSURE_CAP_PERCENT;
 
-        RiskAdjustedMomentumResult calculation = calculateMomentum(assetDataType, calculationDate);
+        RiskAdjustedMomentumResult calculation = calculateMomentum(assetDataType, calculationDate, stockSymbols);
         if (!calculation.isValid()) {
             return calculation;
         }
 
         Map<String, NavigableMap<LocalDate, OHLCV>> universeSeries =
-                RiskAdjustedMomentumRiskOverlayUtil.normalize(universeRawData(assetDataType));
+                RiskAdjustedMomentumRiskOverlayUtil.normalize(filteredUniverseRawData(assetDataType, stockSymbols));
         Map<String, NavigableMap<LocalDate, OHLCV>> indexSeries =
                 RiskAdjustedMomentumRiskOverlayUtil.normalize(stockPriceCacheService.getCachedAllIndexPriceData());
         NavigableMap<LocalDate, OHLCV> benchmarkSeries = RiskAdjustedMomentumRiskOverlayUtil.resolveBenchmark(indexSeries, effectiveBenchmark);
@@ -200,12 +213,17 @@ public class RiskAdjustedMomentumService {
     }
 
     public RiskAdjustedMomentumResult calculateMomentum(AssetDataType assetDataType, LocalDate asOfDate) {
+        return calculateMomentum(assetDataType, asOfDate, null);
+    }
+
+    public RiskAdjustedMomentumResult calculateMomentum(AssetDataType assetDataType, LocalDate asOfDate,
+                                                        Collection<String> stockSymbols) {
         try {
             if (asOfDate.isAfter(LocalDate.now(MARKET_TIME_ZONE))) {
                 throw new IllegalArgumentException("As-of date cannot be in the future");
             }
             log.info("Calculating {} risk-adjusted momentum as of {}", assetDataType, asOfDate);
-            Map<String, List<OHLCV>> stockData = universeRawData(assetDataType);
+            Map<String, List<OHLCV>> stockData = filteredUniverseRawData(assetDataType, stockSymbols);
             validateInput(stockData);
 
             List<RiskAdjustedMomentum> allResults = new ArrayList<>();
@@ -268,6 +286,19 @@ public class RiskAdjustedMomentumService {
             return new RiskAdjustedMomentumResult(Collections.emptyList(), Collections.emptyList(),
                     Collections.emptyList(), Collections.emptyList(), false, e.getMessage());
         }
+    }
+
+    private Map<String, List<OHLCV>> filteredUniverseRawData(AssetDataType assetDataType,
+                                                              Collection<String> stockSymbols) {
+        Map<String, List<OHLCV>> raw = universeRawData(assetDataType);
+        if (assetDataType != AssetDataType.STOCK || stockSymbols == null) return raw;
+        Set<String> universe = stockSymbols.stream().filter(Objects::nonNull)
+                .map(symbol -> symbol.trim().toUpperCase(Locale.ROOT))
+                .filter(symbol -> !symbol.isBlank()).collect(Collectors.toSet());
+        if (universe.isEmpty()) throw new IllegalArgumentException("The selected Nifty index does not contain any stocks");
+        return raw.entrySet().stream()
+                .filter(entry -> universe.contains(entry.getKey().trim().toUpperCase(Locale.ROOT)))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
     RiskAdjustedMomentum calculateStockMomentum(String stockName, List<OHLCV> ohlcData, LocalDate asOfDate) {

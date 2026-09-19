@@ -22,5 +22,6 @@ export const routes: Routes = [
   { path: 'data/indices', component: PageRouteComponent },
   { path: 'data/index-constituents', component: PageRouteComponent },
   { path: 'administration/users', component: PageRouteComponent },
+  { path: 'administration/system-metrics', component: PageRouteComponent },
   { path: '**', redirectTo: 'overview/dashboard' },
 ];

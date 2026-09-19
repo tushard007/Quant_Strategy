@@ -20,13 +20,14 @@ import { RiskAdjustedMomentumAnalysisComponent } from './risk-adjusted-momentum-
 import { RiskAdjustedMomentumBacktestComponent } from './risk-adjusted-momentum-backtest/risk-adjusted-momentum-backtest.component';
 import { MarketBreadthComponent } from './market-breadth/market-breadth.component';
 import { BreadthBacktestComponent } from './breadth-backtest/breadth-backtest.component';
-type Page = 'users' | 'dashboard' | 'login' | 'price' | 'stocks' | 'etfs' | 'indexes' | 'nifty-index-stock' | 'momentum' | 'momentum-backtest' | 'momentum-risk-overlay' | 'risk-adjusted-momentum' | 'risk-adjusted-momentum-backtest' | 'market-breadth' | 'breadth-backtest' | 'technical-indicator';
+import { SystemMetricsComponent } from './system-metrics/system-metrics.component';
+type Page = 'users' | 'system-metrics' | 'dashboard' | 'login' | 'price' | 'stocks' | 'etfs' | 'indexes' | 'nifty-index-stock' | 'momentum' | 'momentum-backtest' | 'momentum-risk-overlay' | 'risk-adjusted-momentum' | 'risk-adjusted-momentum-backtest' | 'market-breadth' | 'breadth-backtest' | 'technical-indicator';
 type NavSectionKey = 'overview' | 'analyze' | 'backtest' | 'data' | 'administration';
 type NavAccess = 'public' | 'authenticated' | 'admin' | 'superadmin';
 interface NavItem { page: Page; label: string; description: string; icon: string; access: NavAccess; }
 interface NavSection { key: NavSectionKey; label: string; items: readonly NavItem[]; }
 const ADMIN_PAGES: readonly Page[] = ['price', 'stocks', 'etfs', 'indexes', 'nifty-index-stock'];
-const SUPERADMIN_PAGES: readonly Page[] = ['users'];
+const SUPERADMIN_PAGES: readonly Page[] = ['users', 'system-metrics'];
 const LOGGED_IN_HOME: Page = 'market-breadth';
 const PAGE_PATHS: Record<Page, string> = {
   dashboard: '/overview/dashboard', login: '/login', 'market-breadth': '/overview/market-breadth',
@@ -35,7 +36,7 @@ const PAGE_PATHS: Record<Page, string> = {
   'momentum-risk-overlay': '/backtest/risk-overlay', 'risk-adjusted-momentum-backtest': '/backtest/risk-adjusted',
   'breadth-backtest': '/backtest/breadth', price: '/data/price-updates', stocks: '/data/stocks',
   etfs: '/data/etfs', indexes: '/data/indices', 'nifty-index-stock': '/data/index-constituents',
-  users: '/administration/users'
+  users: '/administration/users', 'system-metrics': '/administration/system-metrics'
 };
 const PATH_PAGES = new Map(Object.entries(PAGE_PATHS).map(([page, path]) => [path, page as Page]));
 const NAV_SECTIONS: readonly NavSection[] = [
@@ -63,6 +64,7 @@ const NAV_SECTIONS: readonly NavSection[] = [
   ]},
   { key: 'administration', label: 'Administration', items: [
     { page: 'users', label: 'Users', description: 'Accounts and roles', icon: '♙', access: 'superadmin' },
+    { page: 'system-metrics', label: 'System Metrics', description: 'JVM, CPU and health', icon: '▥', access: 'superadmin' },
   ]},
 ];
 type TimeFrame = 'DAILY' | 'WEEKLY';
@@ -71,7 +73,7 @@ type AppTheme = 'forest' | 'ocean' | 'apple' | 'contrast';
 interface PriceSource { key: SourceKey; title: string; shortTitle: string; description: string; path: string; icon: string; }
 interface PriceUpdateJob { id: string; status: 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED'; message: string; processed: number; total: number; saved: number; failedSymbols: string; }
 interface HistoryItem { id: number; sourceKey: SourceKey; title: string; timeFrame: TimeFrame; success: boolean; message: string; completedAt: Date; }
-@Component({ selector: 'app-root', imports: [RouterOutlet, UserManagementComponent, LoginComponent, FormsModule, DatePipe, StockMasterComponent, ETFMasterComponent, IndexMasterComponent, NiftyIndexStockComponent, MomentumAnalysisComponent, MomentumDashboardComponent, MomentumBacktestComponent, MomentumRiskOverlayBacktestComponent, RiskAdjustedMomentumAnalysisComponent, RiskAdjustedMomentumBacktestComponent, TechnicalIndicatorComponent, MarketBreadthComponent, BreadthBacktestComponent], templateUrl: './app.html', styleUrl: './app.scss' })
+@Component({ selector: 'app-root', imports: [RouterOutlet, UserManagementComponent, SystemMetricsComponent, LoginComponent, FormsModule, DatePipe, StockMasterComponent, ETFMasterComponent, IndexMasterComponent, NiftyIndexStockComponent, MomentumAnalysisComponent, MomentumDashboardComponent, MomentumBacktestComponent, MomentumRiskOverlayBacktestComponent, RiskAdjustedMomentumAnalysisComponent, RiskAdjustedMomentumBacktestComponent, TechnicalIndicatorComponent, MarketBreadthComponent, BreadthBacktestComponent], templateUrl: './app.html', styleUrl: './app.scss' })
 export class App {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);

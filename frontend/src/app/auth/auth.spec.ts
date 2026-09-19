@@ -43,6 +43,14 @@ describe('JWT authentication', () => {
     }
   });
 
+  it('attaches JWT to same-origin actuator calls', () => {
+    login();
+    http.get('/actuator/metrics').subscribe();
+    const actuator = requests.expectOne('/actuator/metrics');
+    expect(actuator.request.headers.get('Authorization')).toBe('Bearer jwt-token');
+    actuator.flush({ names: [] });
+  });
+
   it('clears the session on 401 but preserves it on 403', () => {
     login();
     http.get('/api/stock-master').subscribe({ error: () => {} });

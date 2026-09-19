@@ -6,15 +6,16 @@ import { AuthService } from './auth.service';
 export const authInterceptor: HttpInterceptorFn = (request, next) => {
   const auth = inject(AuthService);
   const url = new URL(request.url, window.location.origin);
-  const isApi = url.origin === window.location.origin && url.pathname.startsWith('/api/');
+  const isProtectedEndpoint = url.origin === window.location.origin
+    && (url.pathname.startsWith('/api/') || url.pathname.startsWith('/actuator/'));
   const isLogin = url.pathname === '/api/auth/login';
-  const token = isApi && !isLogin ? auth.accessToken() : null;
+  const token = isProtectedEndpoint && !isLogin ? auth.accessToken() : null;
   const authenticatedRequest = token
     ? request.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
     : request;
   return next(authenticatedRequest).pipe(
     catchError((error: HttpErrorResponse) => {
-      if (isApi && !isLogin) {
+      if (isProtectedEndpoint && !isLogin) {
         if (error.status === 401 && token && auth.accessToken() === token) {
           auth.logout('Your session expired. Sign in again to continue.');
         } else if (error.status === 403) {
