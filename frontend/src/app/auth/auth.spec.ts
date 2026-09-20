@@ -63,15 +63,27 @@ describe('JWT authentication', () => {
     expect(auth.accessToken()).toBeNull();
   });
 
-  it('expires the session automatically and logout clears credentials', () => {
+  it('silently renews the session before expiry and logout clears credentials', () => {
     vi.useFakeTimers();
     login();
     expect(auth.isAuthenticated()).toBe(true);
-    vi.advanceTimersByTime(900_000);
-    expect(auth.isAuthenticated()).toBe(false);
-    expect(auth.message()).toContain('expired');
-    login();
+    vi.advanceTimersByTime(840_000);
+    const refresh = requests.expectOne('/api/auth/refresh');
+    expect(refresh.request.headers.get('Authorization')).toBe('Bearer jwt-token');
+    refresh.flush({ accessToken: 'renewed-jwt-token', tokenType: 'Bearer',
+      expiresAt: new Date(Date.now() + 900_000).toISOString(),
+      user: { username: 'user@example.com', roles: ['USER'] } });
+    expect(auth.accessToken()).toBe('renewed-jwt-token');
     auth.logout();
     expect(auth.accessToken()).toBeNull();
+  });
+
+  it('logs out once when token renewal fails', () => {
+    vi.useFakeTimers();
+    login();
+    vi.advanceTimersByTime(840_000);
+    requests.expectOne('/api/auth/refresh').flush({}, { status: 401, statusText: 'Unauthorized' });
+    expect(auth.isAuthenticated()).toBe(false);
+    expect(auth.message()).toContain('expired');
   });
 });

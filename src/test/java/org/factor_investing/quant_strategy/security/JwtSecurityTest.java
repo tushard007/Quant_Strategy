@@ -101,6 +101,18 @@ class JwtSecurityTest {
     }
 
     @Test
+    void refreshIssuesReplacementJwtForAuthenticatedUser() throws Exception {
+        String token = login("user@example.com", "user-test-password");
+        var result = mvc.perform(post("/api/auth/refresh").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store")).andReturn();
+        Jwt refreshed = decoder.decode(mapper.readTree(result.getResponse().getContentAsString()).get("accessToken").asText());
+        assertThat(refreshed.getSubject()).isEqualTo("user@example.com");
+        assertThat(refreshed.getClaimAsStringList("roles")).containsExactly("USER");
+        assertThat(refreshed.getExpiresAt()).isAfter(Instant.now()).isBefore(Instant.now().plusSeconds(901));
+        mvc.perform(post("/api/auth/refresh")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void loginRejectsInvalidAndMissingCredentialsAndIgnoresClientRole() throws Exception {
         mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"username\":\"admin@example.com\",\"password\":\"wrong-password\"}"))

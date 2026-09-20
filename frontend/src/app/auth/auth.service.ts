@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { tap } from 'rxjs';
+import { Subscription, tap } from 'rxjs';
 
 export interface CurrentUser {
   username: string;
@@ -16,9 +16,11 @@ export interface LoginResponse {
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
+  private static readonly RENEWAL_LEAD_TIME_MS = 60_000;
   private readonly http = inject(HttpClient);
   private readonly session = signal<LoginResponse | null>(null);
   private expiryTimer?: ReturnType<typeof setTimeout>;
+  private refreshSubscription?: Subscription;
   readonly user = computed(() => this.session()?.user ?? null);
   readonly isAuthenticated = computed(() => this.user() !== null);
   readonly isSuperadmin = computed(() => this.user()?.roles.includes('SUPERADMIN') ?? false);
@@ -31,11 +33,7 @@ export class AuthService {
     return this.http.post<LoginResponse>('/api/auth/login', { username, password }).pipe(
       tap(session => {
         this.logout();
-        this.session.set(session);
-        this.expiryTimer = setTimeout(
-          () => this.logout('Your session expired. Sign in again to continue.'),
-          Math.max(0, Date.parse(session.expiresAt) - Date.now()),
-        );
+        this.startSession(session);
       }),
     );
   }
@@ -51,7 +49,33 @@ export class AuthService {
 
   logout(message: string | null = null): void {
     clearTimeout(this.expiryTimer);
+    this.refreshSubscription?.unsubscribe();
+    this.refreshSubscription = undefined;
     this.session.set(null);
     this.message.set(message);
+  }
+
+  private startSession(session: LoginResponse): void {
+    this.session.set(session);
+    this.scheduleRefresh(session);
+  }
+
+  private scheduleRefresh(session: LoginResponse): void {
+    clearTimeout(this.expiryTimer);
+    const delay = Math.max(0, Date.parse(session.expiresAt) - Date.now() - AuthService.RENEWAL_LEAD_TIME_MS);
+    this.expiryTimer = setTimeout(() => this.refresh(session.accessToken), delay);
+  }
+
+  private refresh(token: string): void {
+    this.refreshSubscription = this.http.post<LoginResponse>('/api/auth/refresh', {}).subscribe({
+      next: session => {
+        if (this.session()?.accessToken === token) this.startSession(session);
+      },
+      error: () => {
+        if (this.session()?.accessToken === token) {
+          this.logout('Your session expired. Sign in again to continue.');
+        }
+      },
+    });
   }
 }

@@ -26,10 +26,12 @@ import java.util.Map;
 public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final JwtEncoder encoder;
+    private final DatabaseUserDetailsService users;
 
-    public AuthController(AuthenticationManager authenticationManager, JwtEncoder encoder) {
+    public AuthController(AuthenticationManager authenticationManager, JwtEncoder encoder, DatabaseUserDetailsService users) {
         this.authenticationManager = authenticationManager;
         this.encoder = encoder;
+        this.users = users;
     }
 
     @PostMapping("/login")
@@ -37,13 +39,22 @@ public class AuthController {
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         Authentication authentication = authenticationManager.authenticate(
                 UsernamePasswordAuthenticationToken.unauthenticated(request.username(), request.password()));
+        return issueToken(authentication, (AccountPrincipal) authentication.getPrincipal());
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<LoginResponse> refresh(Authentication authentication) {
+        return issueToken(authentication, users.loadUserByUsername(authentication.getName()));
+    }
+
+    private ResponseEntity<LoginResponse> issueToken(Authentication authentication, AccountPrincipal account) {
         Instant now = Instant.now();
         Instant expiresAt = now.plusSeconds(900);
         var user = currentUser(authentication);
         var claims = JwtClaimsSet.builder().issuer(SecurityConfiguration.ISSUER)
                 .audience(List.of(SecurityConfiguration.AUDIENCE)).subject(user.username())
                 .issuedAt(now).expiresAt(expiresAt).claim("roles", user.roles())
-                .claim("auth_version", ((AccountPrincipal) authentication.getPrincipal()).tokenVersion()).build();
+                .claim("auth_version", account.tokenVersion()).build();
         String token = encoder.encode(JwtEncoderParameters.from(
                 JwsHeader.with(MacAlgorithm.HS256).build(), claims)).getTokenValue();
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())

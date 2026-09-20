@@ -9,6 +9,7 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
   const isProtectedEndpoint = url.origin === window.location.origin
     && (url.pathname.startsWith('/api/') || url.pathname.startsWith('/actuator/'));
   const isLogin = url.pathname === '/api/auth/login';
+  const isRefresh = url.pathname === '/api/auth/refresh';
   const token = isProtectedEndpoint && !isLogin ? auth.accessToken() : null;
   const authenticatedRequest = token
     ? request.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
@@ -16,7 +17,7 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
   return next(authenticatedRequest).pipe(
     catchError((error: HttpErrorResponse) => {
       if (isProtectedEndpoint && !isLogin) {
-        if (error.status === 401 && token && auth.accessToken() === token) {
+        if (error.status === 401 && !isRefresh && token && auth.accessToken() === token) {
           auth.logout('Your session expired. Sign in again to continue.');
         } else if (error.status === 403) {
           auth.message.set('Your account does not have access to this operation.');
