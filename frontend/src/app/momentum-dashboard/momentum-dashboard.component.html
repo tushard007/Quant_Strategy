@@ -1,48 +1,68 @@
-<header>
-  <div><p class="eyebrow">MOMENTUM STRATEGY</p><h1>Momentum dashboard</h1><p class="subtitle">Monitor relative strength, leading assets and recent strategy runs.</p></div>
-  <div class="header-actions"><label><span>Asset type</span><select [ngModel]="assetType" (ngModelChange)="assetTypeChanged($event)"><option value="STOCK">Stocks</option><option value="ETF">ETFs</option><option value="INDEX">Indices</option></select></label><button class="outline-button" type="button" (click)="openAnalysis.emit()">Open full analysis <span>→</span></button></div>
-</header>
+<div class="broker-page">
+  <header class="page-header">
+    <div><p class="eyebrow">BROKER LEDGER</p><div class="title-line"><h1>Portfolio & ledger</h1><span class="market-status"><i></i>Market open</span></div><p class="subtitle">Positions, funds and every trade in one reconciled view.</p></div>
+    <div class="header-actions"><label><span>Account</span><select aria-label="Trading account"><option>TD928401 · Equity</option></select></label><button class="outline" type="button">⇩ Export ledger</button><button class="primary" type="button" (click)="openAnalysis.emit()">＋ Add transaction</button></div>
+  </header>
 
-@if (error()) {<div class="alert"><strong>!</strong><p>{{ error() }}</p><button type="button" aria-label="Dismiss error" (click)="error.set(null)">×</button></div>}
-
-@if (result()) {
-  <section class="metrics">
-    <article><span>{{ loadedFromHistory() ? 'Saved results' : 'Assets analyzed' }}</span><strong>{{ result()?.totalAnalyzed | number }}</strong><small>{{ assetLabel(assetType) }} · {{ asOfDate }}</small></article>
-    <article><span>Momentum qualified</span><strong>{{ result()?.qualifiedCount | number }}</strong><small>{{ result()?.totalAnalyzed ? ((result()!.qualifiedCount / result()!.totalAnalyzed) * 100 | number:'1.0-1') : 0 }}% of displayed universe</small></article>
-    <article><span>Median 12M return</span><strong [class.negative]="medianOneYear() < 0">{{ medianOneYear() | number:'1.2-2' }}%</strong><small>Across displayed assets</small></article>
+  <section class="account-strip" aria-label="Account summary">
+    <article><div><span>Portfolio value</span><strong>₹24,86,420.50</strong></div><small class="positive">+₹18,240.20 today · 0.74%</small></article>
+    <article><span>Invested value</span><strong>₹21,67,780.00</strong><small>Across 10 holdings</small></article>
+    <article><span>Unrealised P&amp;L</span><strong class="positive">+₹3,18,640.50</strong><small class="positive">+14.70% overall</small></article>
+    <article><span>Realised P&amp;L</span><strong class="positive">+₹86,420.00</strong><small>FY 2026–27</small></article>
+    <article class="funds-card"><span>Available funds</span><strong>₹3,18,640.00</strong><button type="button">Manage funds →</button></article>
   </section>
 
-  <section class="dashboard-grid">
-    <article class="panel leaders-panel">
-      <div class="panel-heading"><div><h2>Top weighted momentum</h2><p>Lowest combined rank score leads.</p></div><span>{{ assetLabel(assetType) }}</span></div>
-      <div class="leader-list">
-        @for (asset of topFive(); track asset.stockName; let position = $index) {
-          <div class="leader-row"><b>{{ position + 1 }}</b><strong>{{ asset.stockName }}</strong><div class="mini-bars"><i class="bar one" [style.width.%]="barWidth(asset.oneYearReturn)"></i><i class="bar six" [style.width.%]="barWidth(asset.sixMonthReturn)"></i><i class="bar three" [style.width.%]="barWidth(asset.threeMonthReturn)"></i></div><span>{{ asset.totalRankScore | number:'1.0-0' }}</span></div>
-        }
+  <section class="panel portfolio-chart" aria-labelledby="portfolio-chart-title">
+    <div class="chart-header">
+      <div><h2 id="portfolio-chart-title">Daily portfolio value</h2><p>Invested capital compared with end-of-day market value</p></div>
+      <div class="chart-controls" aria-label="Chart period">
+        @for (range of chartRanges; track range) {<button type="button" [class.active]="chartRange() === range" [attr.aria-pressed]="chartRange() === range" (click)="chartRange.set(range)">{{ range }}</button>}
       </div>
-      <div class="legend"><span><i class="one"></i>12 month</span><span><i class="six"></i>6 month</span><span><i class="three"></i>3 month</span></div>
-    </article>
-    <article class="panel distribution-panel">
-      <div class="panel-heading"><div><h2>Positive return distribution</h2><p>Share of assets above zero.</p></div></div>
-      <div class="distribution"><div><strong>{{ positive12() | number:'1.0-0' }}%</strong><span>12 month</span><i><b [style.width.%]="positive12()"></b></i></div><div><strong>{{ positive6() | number:'1.0-0' }}%</strong><span>6 month</span><i><b [style.width.%]="positive6()"></b></i></div><div><strong>{{ positive3() | number:'1.0-0' }}%</strong><span>3 month</span><i><b [style.width.%]="positive3()"></b></i></div></div>
-    </article>
+    </div>
+    <div class="chart-summary">
+      <div><span>Current value</span><strong>₹24,86,420.50</strong><small class="positive">+₹18,240.20 today</small></div>
+      <div><span>Invested</span><strong>₹21,67,780.00</strong><small>Net capital deployed</small></div>
+      <div><span>Value created</span><strong class="positive">₹3,18,640.50</strong><small class="positive">14.70% above invested</small></div>
+      <div class="chart-legend"><span><i class="current-line"></i>Current value</span><span><i class="invested-line"></i>Invested value</span></div>
+    </div>
+    <div class="line-chart">
+      <div class="y-axis"><span>₹25L</span><span>₹23L</span><span>₹21L</span><span>₹19L</span></div>
+      <svg viewBox="0 0 1060 245" role="img" aria-label="Daily chart showing current portfolio value rising above invested capital">
+        <defs><linearGradient id="value-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16805b" stop-opacity=".19"/><stop offset="1" stop-color="#16805b" stop-opacity="0"/></linearGradient></defs>
+        <g class="chart-grid"><path d="M0 20H1060M0 85H1060M0 150H1060M0 215H1060"/></g>
+        <path class="value-area" d="M0 193 C35 185 60 188 92 176 S150 164 183 158 S238 166 273 146 S330 139 365 130 S424 137 459 113 S520 109 551 98 S610 104 645 83 S704 76 738 65 S798 70 830 51 S891 48 920 38 S985 44 1060 21 L1060 245 L0 245Z"/>
+        <path class="invested-path" d="M0 210 L108 210 L108 197 L263 197 L263 181 L405 181 L405 165 L570 165 L570 148 L735 148 L735 133 L890 133 L890 119 L1060 119"/>
+        <path class="current-path" d="M0 193 C35 185 60 188 92 176 S150 164 183 158 S238 166 273 146 S330 139 365 130 S424 137 459 113 S520 109 551 98 S610 104 645 83 S704 76 738 65 S798 70 830 51 S891 48 920 38 S985 44 1060 21"/>
+        <g class="deposit-markers"><circle cx="108" cy="197" r="3"/><circle cx="263" cy="181" r="3"/><circle cx="405" cy="165" r="3"/><circle cx="570" cy="148" r="3"/><circle cx="735" cy="133" r="3"/><circle cx="890" cy="119" r="3"/></g>
+        <circle class="current-dot" cx="1060" cy="21" r="5"/>
+      </svg>
+      <div class="latest-value"><span>26 Sep</span><strong>₹24.86L</strong></div>
+      <div class="x-axis"><span>{{ rangeStartLabel() }}</span><span>Today</span></div>
+    </div>
+    <div class="chart-note"><span>＋</span><p>Invested value steps up on buy transactions. Current value changes daily with market prices.</p></div>
   </section>
 
-  <section class="panel table-panel">
-    <div class="panel-heading"><div><h2>Leading assets</h2><p>Top ten assets ranked by weighted momentum.</p></div><button type="button" (click)="openAnalysis.emit()">View all results</button></div>
-    <div class="table-scroll"><table><thead><tr><th>Position</th><th>Asset</th><th>12M return</th><th>6M return</th><th>3M return</th><th>Total rank</th></tr></thead><tbody>@for (asset of leaders(); track asset.stockName; let position = $index) {<tr><td><span class="rank">{{ position + 1 }}</span></td><td><strong>{{ asset.stockName }}</strong></td><td [class.negative]="asset.oneYearReturn < 0">{{ asset.oneYearReturn | number:'1.2-2' }}%</td><td [class.negative]="asset.sixMonthReturn < 0">{{ asset.sixMonthReturn | number:'1.2-2' }}%</td><td [class.negative]="asset.threeMonthReturn < 0">{{ asset.threeMonthReturn | number:'1.2-2' }}%</td><td><b>{{ asset.totalRankScore | number:'1.0-0' }}</b></td></tr>}</tbody></table></div>
-  </section>
-} @else if (loading()) {
-  <section class="empty-state"><i class="large-spinner"></i><h2>Calculating momentum</h2><p>Reading historical prices and ranking {{ assetLabel(assetType).toLowerCase() }}.</p></section>
-} @else {
-  <section class="empty-state"><span>↗</span><h2>No saved momentum result</h2><p>Choose another asset type or open full analysis to create the first execution.</p></section>
-}
+  <nav class="view-tabs" aria-label="Portfolio views"><button class="active" type="button">Overview</button><button type="button">Holdings <span>10</span></button><button type="button">Trade ledger</button><button type="button">P&amp;L statement</button></nav>
 
-<section class="panel history-panel">
-  <div class="panel-heading"><div><h2>Recent executions</h2><p>Open a saved momentum result without recalculating it.</p></div>@if (historyLoading()) {<small>Loading…</small>}</div>
-  @if (executions().length) {<div class="execution-groups">
-    <section><h3>Stocks</h3><div class="execution-list">@for (execution of stockExecutions().slice(0, 3); track execution.strategyRunDate) {<article><div><strong>Stocks · {{ execution.strategyRunDate | date:'d MMM y':'UTC' }}</strong><small>{{ execution.resultCount }} qualified · {{ execution.analyzedCount }} analyzed</small></div><button type="button" (click)="loadExecution(execution)">Load</button></article>} @empty {<p>No stock executions</p>}</div></section>
-    <section><h3>ETFs</h3><div class="execution-list">@for (execution of etfExecutions().slice(0, 3); track execution.strategyRunDate) {<article><div><strong>ETFs · {{ execution.strategyRunDate | date:'d MMM y':'UTC' }}</strong><small>{{ execution.resultCount }} qualified · {{ execution.analyzedCount }} analyzed</small></div><button type="button" (click)="loadExecution(execution)">Load</button></article>} @empty {<p>No ETF executions</p>}</div></section>
-    <section><h3>Indices</h3><div class="execution-list">@for (execution of indexExecutions().slice(0, 3); track execution.strategyRunDate) {<article><div><strong>Indices · {{ execution.strategyRunDate | date:'d MMM y':'UTC' }}</strong><small>{{ execution.resultCount }} qualified · {{ execution.analyzedCount }} analyzed</small></div><button type="button" (click)="loadExecution(execution)">Load</button></article>} @empty {<p>No index executions</p>}</div></section>
-  </div>} @else if (!historyLoading()) {<p class="no-history">No saved momentum executions are available yet.</p>}
-</section>
+  <section class="workspace-grid">
+    <article class="panel holdings-panel">
+      <div class="panel-heading"><div><h2>Current holdings</h2><p>Delivery positions · as of today</p></div><div class="panel-actions"><label class="search"><span>⌕</span><input type="search" placeholder="Search symbol" [ngModel]="searchTerm()" (ngModelChange)="searchTerm.set($event)" aria-label="Search holdings"></label><button type="button">All holdings →</button></div></div>
+      <div class="table-scroll"><table><thead><tr><th>Instrument</th><th>Qty.</th><th>Avg. price</th><th>LTP</th><th>Current value</th><th>Day P&amp;L</th><th>Overall P&amp;L</th><th></th></tr></thead><tbody>
+        @for (asset of filteredAssets(); track asset.stockName; let i = $index) {<tr><td><div class="instrument"><span [style.background]="assetColor(i)">{{ initials(asset.stockName) }}</span><div><strong>{{ asset.stockName }}</strong><small>NSE · CNC</small></div></div></td><td>{{ quantityFor(i) }}</td><td>₹{{ averagePriceFor(i) }}</td><td><strong>₹{{ ltpFor(i) }}</strong></td><td>₹{{ valueFor(i) }}</td><td class="positive">+₹{{ dayPnlFor(i) }}</td><td><strong class="positive">+{{ asset.oneYearReturn | number:'1.1-1' }}%</strong><small class="pnl-value">+₹{{ overallPnlFor(i) }}</small></td><td><button class="row-menu" type="button" [attr.aria-label]="'Actions for ' + asset.stockName">•••</button></td></tr>} @empty {<tr><td class="empty-row" colspan="8">No holding matches “{{ searchTerm() }}”.</td></tr>}
+      </tbody></table></div>
+      <div class="table-footer"><span>Showing {{ filteredAssets().length }} of {{ portfolioAssets().length }} holdings</span><div><span>Total current value</span><strong>₹21,67,780.00</strong></div></div>
+    </article>
+
+    <aside class="right-rail">
+      <article class="panel allocation-card"><div class="panel-heading"><div><h2>Portfolio allocation</h2><p>By sector</p></div><button class="row-menu" type="button" aria-label="Allocation options">•••</button></div><div class="donut-row"><div class="donut"><div><strong>87.2%</strong><span>invested</span></div></div><div class="legend"><div><span><i class="tech"></i>Technology</span><strong>34%</strong></div><div><span><i class="finance"></i>Financials</span><strong>28%</strong></div><div><span><i class="auto"></i>Auto</span><strong>18%</strong></div><div><span><i class="other"></i>Other</span><strong>20%</strong></div></div></div></article>
+      <article class="panel settlement-card"><div class="panel-heading"><div><h2>Settlement</h2><p>Upcoming obligations</p></div></div><div class="settlement-list"><div><span class="date-box"><strong>29</strong><small>SEP</small></span><div><strong>T+1 receivable</strong><small>RELIANCE sell · 12 shares</small></div><b class="positive">+₹35,824</b></div><div><span class="date-box amber"><strong>30</strong><small>SEP</small></span><div><strong>Funds due</strong><small>ICICIBANK buy · 25 shares</small></div><b class="negative">−₹32,140</b></div></div></article>
+    </aside>
+  </section>
+
+  <section class="panel ledger-panel">
+    <div class="panel-heading"><div><h2>Recent trade ledger</h2><p>Chronological record of executed buy and sell orders</p></div><div class="ledger-filters"><label><span>Period</span><select aria-label="Ledger period"><option>Last 30 days</option><option>This quarter</option><option>Financial year</option></select></label><button type="button">View full ledger →</button></div></div>
+    <div class="table-scroll"><table><thead><tr><th>Trade date</th><th>Instrument</th><th>Transaction</th><th>Quantity</th><th>Trade price</th><th>Gross amount</th><th>Charges</th><th>Net amount</th><th>Settlement</th></tr></thead><tbody>
+      @for (trade of trades; track trade.date + trade.symbol) {<tr><td><strong>{{ trade.date }}</strong><small class="pnl-value">{{ trade.time }}</small></td><td><div class="ledger-symbol"><strong>{{ trade.symbol }}</strong><small>NSE · {{ trade.order }}</small></div></td><td><span class="trade-type" [class.sell]="trade.type === 'SELL'">{{ trade.type }}</span></td><td>{{ trade.quantity }}</td><td>₹{{ trade.price }}</td><td>₹{{ trade.gross }}</td><td>₹{{ trade.charges }}</td><td><strong [class.positive]="trade.type === 'SELL'" [class.negative]="trade.type === 'BUY'">{{ trade.type === 'SELL' ? '+' : '−' }}₹{{ trade.net }}</strong></td><td><span class="settled" [class.pending]="trade.status !== 'Settled'">{{ trade.status }}</span></td></tr>}
+    </tbody></table></div>
+  </section>
+</div>

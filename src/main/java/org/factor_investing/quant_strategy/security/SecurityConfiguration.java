@@ -74,7 +74,7 @@ public class SecurityConfiguration {
                         .requestMatchers("/actuator/**").hasRole("SUPERADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/momentum/executions",
                                 "/api/momentum/executions/{assetDataType}/{strategyRunDate}").permitAll()
-                        .requestMatchers("/api/auth/me").hasAnyRole("SUPERADMIN", "ADMIN", "USER")
+                        .requestMatchers("/api/auth/me", "/api/auth/refresh").hasAnyRole("SUPERADMIN", "ADMIN", "USER")
                         .requestMatchers(HttpMethod.GET, "/api/market-breadth/latest", "/api/market-breadth/history",
                                 "/api/market-breadth/sectors", "/api/market-breadth/config", "/api/market-breadth/export",
                                 "/api/market-breadth/alerts", "/api/market-breadth/reference-data/check").hasAnyRole("SUPERADMIN", "ADMIN", "USER")

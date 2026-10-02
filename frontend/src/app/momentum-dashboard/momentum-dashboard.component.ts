@@ -21,6 +21,9 @@ export class MomentumDashboardComponent implements OnInit {
   readonly executions = signal<MomentumExecution[]>([]);
   readonly error = signal<string | null>(null);
   readonly loadedFromHistory = signal(false);
+  readonly chartRange = signal<'1M' | '3M' | '6M' | '1Y'>('1Y');
+  readonly chartRanges = ['1M', '3M', '6M', '1Y'] as const;
+  readonly searchTerm = signal('');
   assetType: AssetDataType = 'STOCK';
   asOfDate = this.today;
 
@@ -34,6 +37,21 @@ export class MomentumDashboardComponent implements OnInit {
   readonly stockExecutions = computed(() => this.executions().filter(item => item.assetDataType === 'STOCK'));
   readonly etfExecutions = computed(() => this.executions().filter(item => item.assetDataType === 'ETF'));
   readonly indexExecutions = computed(() => this.executions().filter(item => item.assetDataType === 'INDEX'));
+  readonly usingPreviewData = computed(() => this.rankedAssets().length === 0);
+  readonly portfolioAssets = computed(() => (this.rankedAssets().length ? this.leaders() : this.previewAssets()).slice(0, 10));
+  readonly filteredAssets = computed(() => {
+    const query = this.searchTerm().trim().toLowerCase();
+    return query ? this.portfolioAssets().filter(asset => asset.stockName.toLowerCase().includes(query)) : this.portfolioAssets();
+  });
+  readonly periodReturn = computed(() => ({'1M': 3.2, '3M': 7.8, '6M': 11.6, '1Y': 14.7})[this.chartRange()]);
+  readonly alpha = computed(() => Math.max(0, this.periodReturn() - 8.4).toFixed(1));
+  readonly rangeStartLabel = computed(() => ({'1M': '26 Aug', '3M': '26 Jun', '6M': '26 Mar', '1Y': 'Sep 2025'})[this.chartRange()]);
+  readonly trades = [
+    {date: '26 Sep 2026', time: '14:32', symbol: 'ICICIBANK', type: 'BUY', quantity: 25, price: '1,282.40', gross: '32,060.00', charges: '80.35', net: '32,140.35', order: 'CNC', status: 'Pending T+1'},
+    {date: '25 Sep 2026', time: '11:18', symbol: 'RELIANCE', type: 'SELL', quantity: 12, price: '2,991.15', gross: '35,893.80', charges: '69.55', net: '35,824.25', order: 'CNC', status: 'Pending T+1'},
+    {date: '22 Sep 2026', time: '10:06', symbol: 'TRENT', type: 'BUY', quantity: 8, price: '6,842.50', gross: '54,740.00', charges: '103.20', net: '54,843.20', order: 'CNC', status: 'Settled'},
+    {date: '18 Sep 2026', time: '15:04', symbol: 'INFY', type: 'SELL', quantity: 30, price: '1,604.20', gross: '48,126.00', charges: '92.10', net: '48,033.90', order: 'CNC', status: 'Settled'},
+  ] as const;
 
   ngOnInit(): void { this.loadHistory(true); }
 
@@ -43,6 +61,18 @@ export class MomentumDashboardComponent implements OnInit {
     this.error.set(null);
     this.loadLatestForType();
   }
+
+  refresh(): void { this.loadHistory(true); }
+  initials(name: string): string { return name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase(); }
+  assetColor(index: number): string { return ['#174d3e','#426f82','#b27b2f','#655c85','#36715f','#8d5a4a'][index % 6]; }
+  weightFor(index: number): number { return [14, 13, 12, 11, 10, 10, 9, 8, 7, 6][index] ?? 5; }
+  valueFor(index: number): string { return ['3,48,099','3,23,235','2,98,370','2,73,506','2,48,642','2,48,642','2,23,778','1,98,914','1,74,049','1,49,185'][index] ?? '1,24,321'; }
+  quantityFor(index: number): number { return [52, 410, 180, 96, 42, 190, 38, 312, 54, 78][index] ?? 25; }
+  averagePriceFor(index: number): string { return ['5,960.20','298.40','1,421.10','2,548.80','5,280.40','1,154.70','4,981.20','412.60','2,876.40','1,684.25'][index] ?? '1,250.00'; }
+  ltpFor(index: number): string { return ['6,694.20','788.38','1,657.61','2,849.02','5,920.05','1,308.64','5,888.89','637.54','3,223.13','1,912.63'][index] ?? '1,480.00'; }
+  dayPnlFor(index: number): string { return ['2,184','1,526','1,206','982','744','628','514','408','316','242'][index] ?? '180'; }
+  overallPnlFor(index: number): string { return ['38,168','52,430','42,572','28,821','26,865','29,248','34,492','70,176','18,724','17,814'][index] ?? '8,240'; }
+  momentumScore(asset: MomentumAsset): number { return Math.max(55, Math.min(98, Math.round(58 + asset.oneYearReturn * .72))); }
 
   loadExecution(execution: MomentumExecution): void {
     this.loading.set(true);
@@ -69,13 +99,23 @@ export class MomentumDashboardComponent implements OnInit {
         this.executions.set(value);
         if (loadLatest) this.loadLatestForType();
       },
-      error: () => this.error.set('Saved momentum executions could not be loaded.')
+      error: () => this.executions.set([])
     });
   }
 
   private loadLatestForType(): void {
     const latest = this.executions().find(execution => execution.assetDataType === this.assetType);
     if (latest) this.loadExecution(latest);
+  }
+
+  private previewAssets(): MomentumAsset[] {
+    const names = this.assetType === 'ETF'
+      ? ['MOM100', 'NIFTYBEES', 'GOLDBEES', 'BANKBEES', 'ITBEES', 'JUNIORBEES', 'MON100', 'AUTOBEES', 'PHARMABEES', 'MID150BEES']
+      : this.assetType === 'INDEX'
+        ? ['Nifty Alpha 50', 'Nifty 200 Momentum 30', 'Nifty Midcap 150', 'Nifty IT', 'Nifty Auto', 'Nifty Bank', 'Nifty Pharma', 'Nifty Next 50', 'Nifty 500', 'Nifty 50']
+        : ['TRENT', 'BEL', 'BHARTIARTL', 'M&M', 'BAJAJ-AUTO', 'ICICIBANK', 'HAL', 'COALINDIA', 'LT', 'SUNPHARMA'];
+    const returns = [44.8, 39.2, 35.7, 32.1, 29.4, 27.8, 24.6, 22.3, 19.8, 17.5];
+    return names.map((stockName, index) => ({stockName, oneYearReturn: returns[index], sixMonthReturn: returns[index] * .61, threeMonthReturn: returns[index] * .31, qualifiesForMomentum: true, strategyRunDate: this.today, totalRankScore: index + 1}));
   }
 
   private positivePercentage(field: 'oneYearReturn' | 'sixMonthReturn' | 'threeMonthReturn'): number {
